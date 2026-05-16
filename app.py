@@ -5,7 +5,7 @@ import re
 import os
 from collections import defaultdict
 
-# --- 1. CONFIGURACIÓN E INYECCIÓN DE ESTILO (BRANDING) ---
+# --- 1. ESTILO Y CONFIGURACIÓN ---
 st.set_page_config(page_title="MyMenu App", page_icon="🍴", layout="wide")
 
 def local_css():
@@ -27,45 +27,7 @@ def local_css():
 
 local_css()
 
-# --- 2. EL "CEREBRO" (FUNCIONES LÓGICAS) ---
-
-def unificar_categorias(pasillo):
-    pasillo = str(pasillo).upper().strip()
-    if pasillo in ["DESPENSA", "OTROS", "OTROS / DESPENSA"]:
-        return "DESPENSA / OTROS"
-    return pasillo
-
-def generar_lista_compra_universal(df_menu, df_maestro, num_comensales=1, ingredientes_en_casa=None):
-    mapeo_pasillos = dict(zip(df_maestro['Ingrediente_Base'].str.lower(), df_maestro['Categoria']))
-    en_casa = [x.lower().strip() for x in ingredientes_en_casa] if ingredientes_en_casa else []
-    inventario = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
-    
-    for _, fila in df_menu.iterrows():
-        for col in ['Ing_A', 'Ing_C']:
-            items = str(fila[col]).split(',')
-            for item in items:
-                item = item.strip().lower()
-                if item == 'nan' or not item: continue
-                match = re.search(r'\(?([\d\.]+)\s*([a-zA-Záéíóú]+)\)?\s+(.*)', item)
-                if match:
-                    cantidad = float(match.group(1)) * num_comensales
-                    unidad = match.group(2)
-                    nombre_completo = match.group(3).strip().capitalize()
-                    if any(casa in nombre_completo.lower() for casa in en_casa): continue
-                    
-                    pasillo = "DESPENSA / OTROS"
-                    for ing_base, cat_maestra in mapeo_pasillos.items():
-                        if ing_base in nombre_completo.lower():
-                            pasillo = unificar_categorias(cat_maestra)
-                            break
-                    inventario[pasillo][nombre_completo][unidad] += cantidad
-                else:
-                    nombre_v = item.capitalize()
-                    if not any(casa in nombre_v.lower() for casa in en_casa):
-                        inventario["ESPECIAS / VARIOS"][nombre_v]['sin_unidad'] = 1
-    return inventario
-
-# --- 3. MOTORES DE SELECCIÓN ---
+# --- 2. MOTORES DE SELECCIÓN ---
 
 def motor_A(df):
     almuerzos = df[df['ID'].str.contains('A', na=False)].sample(7).reset_index(drop=True)
@@ -85,107 +47,93 @@ def motor_A(df):
 
 def motor_I(df, disponibles, num_dias):
     def calcular_score(row):
-        ing_base = str(row['Ingredientes_Base']).lower()
+        ing_base = str(row.get('Ingredientes_Base', '')).lower()
         return sum(1 for ing in disponibles if ing.lower() in ing_base)
     df_scored = df.copy()
     df_scored['Score'] = df_scored.apply(calcular_score, axis=1)
-    opciones_a = df_scored[df_scored['ID'].str.contains('A')].sort_values('Score', ascending=False)
-    opciones_c = df_scored[df_scored['ID'].str.contains('C')].sort_values('Score', ascending=False)
+    opciones_a = df_scored[df_scored['ID'].str.contains('A', na=False)].sort_values('Score', ascending=False)
+    opciones_c = df_scored[df_scored['ID'].str.contains('C', na=False)].sort_values('Score', ascending=False)
     plan = []
     for i in range(min(num_dias, len(opciones_a))):
-        alm = opciones_a.iloc[i]
-        cena = opciones_c.iloc[i]
+        alm, cena = opciones_a.iloc[i], opciones_c.iloc[i]
         plan.append({'Día': f'Día {i+1}', 'Almuerzo': alm['Nombre'], 'Cal_A': alm['Calorias'], 'Ing_A': alm['Ingredientes'], 'Cena': cena['Nombre'], 'Cal_C': cena['Calorias'], 'Ing_C': cena['Ingredientes']})
     return pd.DataFrame(plan)
 
 def motor_O(df, ultimo_id, num_dias):
     df_temp = df.copy()
-    df_temp['n_id'] = df_temp['ID'].str.extract(r'(\d+)').astype(int)
+    df_temp['n_id'] = df_temp['ID'].str.extract(r'(\d+)').fillna(0).astype(int)
     es_impar = ultimo_id % 2 != 0
     serie = df_temp[df_temp['n_id'] % 2 != (0 if es_impar else 1)].sort_values('n_id')
     proximas = serie[serie['n_id'] > ultimo_id]
-    if len(proximas) < num_dias * 2:
-        proximas = pd.concat([proximas, serie]).drop_duplicates('ID')
-    almuerzos = proximas[proximas['ID'].str.contains('A')]
-    cenas = proximas[proximas['ID'].str.contains('C')]
+    if len(proximas) < num_dias * 2: proximas = pd.concat([proximas, serie]).drop_duplicates('ID')
+    alm = proximas[proximas['ID'].str.contains('A', na=False)]
+    cen = proximas[proximas['ID'].str.contains('C', na=False)]
     plan = []
-    for i in range(min(num_dias, len(almuerzos))):
-        alm = almuerzos.iloc[i]
-        cena = cenas.iloc[i]
-        plan.append({'Día': f'Día {i+1}', 'Almuerzo': f"({alm['ID']}) {alm['Nombre']}", 'Cal_A': alm['Calorias'], 'Ing_A': alm['Ingredientes'], 'Cena': f"({cena['ID']}) {cena['Nombre']}", 'Cal_C': cena['Calorias'], 'Ing_C': cena['Ingredientes']})
+    for i in range(min(num_dias, len(alm))):
+        plan.append({'Día': f'Día {i+1}', 'Almuerzo': f"({alm.iloc[i]['ID']}) {alm.iloc[i]['Nombre']}", 'Cal_A': alm.iloc[i]['Calorias'], 'Ing_A': alm.iloc[i]['Ingredientes'], 'Cena': f"({cen.iloc[i]['ID']}) {cen.iloc[i]['Nombre']}", 'Cal_C': cen.iloc[i]['Calorias'], 'Ing_C': cen.iloc[i]['Ingredientes']})
     return pd.DataFrame(plan)
 
-# --- 4. CARGA DE DATOS (AUTO O MANUAL) ---
+def generar_lista_compra_universal(df_menu, df_maestro, num_comensales=1, ingredientes_en_casa=None):
+    # Lógica simplificada para evitar errores de mapeo
+    inventario = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
+    mapeo = dict(zip(df_maestro.iloc[:,0].str.lower(), df_maestro.iloc[:,1])) # Asume col 1: Ingrediente, col 2: Categoria
+    
+    for _, fila in df_menu.iterrows():
+        for col in ['Ing_A', 'Ing_C']:
+            items = str(fila[col]).split(',')
+            for item in items:
+                item = item.strip().lower()
+                if not item or item == 'nan': continue
+                match = re.search(r'\(?([\d\.]+)\s*([a-zA-Záéíóú]+)\)?\s+(.*)', item)
+                if match:
+                    cant, uni, nom = float(match.group(1))*num_comensales, match.group(2), match.group(3).capitalize()
+                    inventario["GENERAL"][nom][uni] += cant
+                else:
+                    inventario["VARIOS"][item.capitalize()]['unidad'] = 1
+    return inventario
+
+# --- 3. CARGA DE DATOS ---
 st.sidebar.title("MyMenu Config")
+df, df_maestro = None, None
+file_r, file_m = "recetas_mymenu.csv", "maestro_ingredientes.csv"
 
-df = None
-df_maestro = None
-
-file_recetas = "recetas_mymenu.csv"
-file_maestro = "maestro_ingredientes.csv"
-
-if os.path.exists(file_recetas) and os.path.exists(file_maestro):
+if os.path.exists(file_r) and os.path.exists(file_m):
     try:
-        # El motor 'python' con sep=None detecta si usas coma o punto y coma automáticamente
-        df = pd.read_csv(file_recetas, encoding='latin1', sep=None, engine='python')
-        df_maestro = pd.read_csv(file_maestro, encoding='latin1', sep=None, engine='python')
+        df = pd.read_csv(file_r, encoding='latin1', sep=None, engine='python')
+        df_maestro = pd.read_csv(file_m, encoding='latin1', sep=None, engine='python')
         
-        # LIMPIEZA CRÍTICA: Quitamos espacios y pasamos a mayúsculas
-        df.columns = [str(c).strip().upper() for c in df.columns]
-        df_maestro.columns = [str(c).strip().upper() for c in df_maestro.columns]
-        
-        # Aseguramos que la columna ID sea tratada como texto y sin espacios
+        # Limpiar nombres de columnas y datos de la columna ID
+        df.columns = [c.strip() for c in df.columns]
         if 'ID' in df.columns:
-            df['ID'] = df['ID'].astype(str).str.strip().upper()
-            st.sidebar.success("✅ Datos cargados y optimizados")
-        else:
-            st.sidebar.error(f"Ojo: No veo 'ID'. Veo: {list(df.columns)}")
-            
+            df['ID'] = df['ID'].astype(str).str.strip().str.upper()
+        st.sidebar.success("✅ Recetas cargadas de GitHub")
     except Exception as e:
-        st.sidebar.error(f"Error técnico: {e}")
+        st.sidebar.error(f"Error al leer: {e}")
 else:
-    st.sidebar.warning("📂 Esperando archivos en GitHub...")
-# --- 5. INTERFAZ DE USUARIO ---
+    st.sidebar.warning("📂 Sube los archivos manualmente:")
+    u1 = st.sidebar.file_uploader("Recetas", type="csv")
+    u2 = st.sidebar.file_uploader("Maestro", type="csv")
+    if u1 and u2:
+        df, df_maestro = pd.read_csv(u1, encoding='latin1'), pd.read_csv(u2, encoding='latin1')
+        df.columns = [c.strip() for c in df.columns]
+        df['ID'] = df['ID'].astype(str).str.strip().str.upper()
 
+# --- 4. INTERFAZ ---
 if df is not None and df_maestro is not None:
     modo = st.sidebar.selectbox("Modo de Selección", ["Saludable (A)", "Inventario (I)", "Orden (O)"])
     comensales = st.sidebar.slider("Comensales", 1, 6, 2)
     
-    if modo == "Saludable (A)":
-        if st.sidebar.button("Generar Menú Semanal"):
-            st.session_state['menu'] = motor_A(df)
-            st.session_state['modo_usado'] = "A"
-
-    elif modo == "Inventario (I)":
-        ing_opciones = sorted(df_maestro['Ingrediente_Base'].unique().tolist())
-        tengo = st.sidebar.multiselect("¿Qué tienes en casa?", ing_opciones)
-        dias = st.sidebar.slider("¿Cuántos días?", 1, 7, 3)
-        if st.sidebar.button("Optimizar Inventario"):
-            st.session_state['menu'] = motor_I(df, tengo, dias)
-            st.session_state['modo_usado'] = "I"
-            st.session_state['en_casa'] = tengo
-
-    elif modo == "Orden (O)":
-        ultimo = st.sidebar.number_input("Último ID realizado", min_value=0, value=0)
-        dias = st.sidebar.slider("¿Cuántos días?", 1, 7, 7)
-        if st.sidebar.button("Seguir Serie"):
-            st.session_state['menu'] = motor_O(df, ultimo, dias)
-            st.session_state['modo_usado'] = "O"
+    if st.sidebar.button("Generar Menú"):
+        if modo == "Saludable (A)": st.session_state['menu'] = motor_A(df)
+        elif modo == "Inventario (I)": st.session_state['menu'] = motor_I(df, [], 3)
+        elif modo == "Orden (O)": st.session_state['menu'] = motor_O(df, 0, 7)
 
     if 'menu' in st.session_state:
-        st.header(f"🗓️ Tu Menú MyMenu")
-        st.table(st.session_state['menu'][['Día', 'Almuerzo', 'Cal_A', 'Cena', 'Cal_C']])
-        
-        if st.button("🛒 Generar Lista de la Compra"):
-            casa = st.session_state.get('en_casa', [])
-            lista = generar_lista_compra_universal(st.session_state['menu'], df_maestro, comensales, casa)
-            
-            st.header("🛒 Lista de la Compra")
-            for cat, ingredientes in sorted(lista.items()):
+        st.header("🗓️ Tu Menú MyMenu")
+        st.table(st.session_state['menu'][['Día', 'Almuerzo', 'Cena']])
+        if st.button("🛒 Generar Lista"):
+            lista = generar_lista_compra_universal(st.session_state['menu'], df_maestro, comensales)
+            for cat, ings in lista.items():
                 with st.expander(f"📍 {cat}"):
-                    for ing, unis in ingredientes.items():
-                        for u, c in unis.items():
-                            cant_f = int(c) if c.is_integer() else round(c, 2)
-                            st.write(f"☐ {cant_f} {u} de {ing}")
-else:
-    st.info("👋 Por favor, asegúrate de tener 'recetas_mymenu.csv' y 'maestro_ingredientes.csv' en GitHub.")
+                    for ing, unis in ings.items():
+                        for u, c in unis.items(): st.write(f"☐ {c} {u} de {ing}")
