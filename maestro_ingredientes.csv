@@ -1,0 +1,70 @@
+Ingrediente_Base;Categoria;Subcategoria
+Pollo;Proteína;Carnes Blancas
+Pavo;Proteína;Carnes Blancas
+Ternera;Proteína;Carnes Rojas
+Cerdo;Proteína;Carnes Rojas
+Merluza;Proteína;Pescado Blanco
+Bacalao;Proteína;Pescado Blanco
+Dorada;Proteína;Pescado Blanco
+Lubina;Proteína;Pescado Blanco
+Trucha;Proteína;Pescado Blanco
+Sepia;Proteína;Marisco
+Salmón;Proteína;Pescado Azul
+Atún;Proteína;Pescado Azul
+Sardinas;Proteína;Pescado Azul
+Boquerones;Proteína;Pescado Azul
+Gambas;Proteína;Marisco
+Langostinos;Proteína;Marisco
+Huevo;Proteína;Huevos
+Lentejas;Proteína;Legumbres
+Garbanzos;Proteína;Legumbres
+Alubias;Proteína;Legumbres
+Calabacín;Vegetal;Hortalizas
+Berenjena;Vegetal;Hortalizas
+Tomate;Vegetal;Hortalizas
+Pimiento;Vegetal;Hortalizas
+Zanahoria;Vegetal;Hortalizas
+Pepino;Vegetal;Hortalizas
+Calabaza;Vegetal;Hortalizas
+Espinacas;Vegetal;Hoja Verde
+Lechuga;Vegetal;Hoja Verde
+Acelgas;Vegetal;Hoja Verde
+Rúcula;Vegetal;Hoja Verde
+Canónigos;Vegetal;Hoja Verde
+Brócoli;Vegetal;Crucíferas
+Coliflor;Vegetal;Crucíferas
+Col;Vegetal;Crucíferas
+Espárragos;Vegetal;Tallos
+Puerro;Vegetal;Bulbos
+Cebolla;Vegetal;Bulbos
+Ajo;Vegetal;Bulbos
+Champiñones;Vegetal;Setas
+Setas;Vegetal;Setas
+Alcachofas;Vegetal;Hortalizas
+Aguacate;Fruta;Grasas
+Mango;Fruta;Dulce
+Piña;Fruta;Ácida
+Manzana;Fruta;Dulce
+Fresas;Fruta;Frutos Rojos
+Melón;Fruta;Dulce
+Limón;Fruta;Cítrico
+Naranja;Fruta;Cítrico
+Almendras;Grasas;Frutos Secos
+Nueces;Grasas;Frutos Secos
+Pistachos;Grasas;Frutos Secos
+Piñones;Grasas;Frutos Secos
+Sésamo;Grasas;Semillas
+Chía;Grasas;Semillas
+Pipas;Grasas;Semillas
+Aceitunas;Grasas;Frutos
+AOVE;Grasas;Aceites
+Queso;Lácteo;Quesos
+Yogur;Lácteo;Yogures
+Leche;Despensa;Líquidos
+Caldo;Despensa;Bases
+Arroz;Carbohidrato;Cereales
+Quinoa;Carbohidrato;Cereales
+Patata;Carbohidrato;Tubérculos
+Pan;Carbohidrato;Cereales
+Especias;Despensa;Condimentos
+Soja;Despensa;Salsas
