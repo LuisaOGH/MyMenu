@@ -116,25 +116,35 @@ def motor_O(df, ultimo_id, num_dias):
     return pd.DataFrame(plan)
 
 # --- 4. CARGA DE DATOS (AUTO O MANUAL) ---
-
 st.sidebar.title("MyMenu Config")
 
 df = None
 df_maestro = None
 
-# Intentar cargar archivos automáticamente desde el repositorio
-if os.path.exists("recetas_mymenu.csv") and os.path.exists("maestro_ingredientes.csv"):
-    df = pd.read_csv("recetas_mymenu.csv", encoding='latin1')
-    df_maestro = pd.read_csv("maestro_ingredientes.csv", encoding='latin1')
-    st.sidebar.success("✅ Recetas cargadas de GitHub")
-else:
-    st.sidebar.warning("📂 Sube los CSV manualmente:")
-    uploaded_recetas = st.sidebar.file_uploader("Subir Recetas (CSV)", type="csv")
-    uploaded_maestro = st.sidebar.file_uploader("Subir Maestro Ingredientes (CSV)", type="csv")
-    if uploaded_recetas and uploaded_maestro:
-        df = pd.read_csv(uploaded_recetas)
-        df_maestro = pd.read_csv(uploaded_maestro)
+file_recetas = "recetas_mymenu.csv"
+file_maestro = "maestro_ingredientes.csv"
 
+if os.path.exists(file_recetas) and os.path.exists(file_maestro):
+    try:
+        # El motor 'python' con sep=None detecta si usas coma o punto y coma automáticamente
+        df = pd.read_csv(file_recetas, encoding='latin1', sep=None, engine='python')
+        df_maestro = pd.read_csv(file_maestro, encoding='latin1', sep=None, engine='python')
+        
+        # LIMPIEZA CRÍTICA: Quitamos espacios y pasamos a mayúsculas
+        df.columns = [str(c).strip().upper() for c in df.columns]
+        df_maestro.columns = [str(c).strip().upper() for c in df_maestro.columns]
+        
+        # Aseguramos que la columna ID sea tratada como texto y sin espacios
+        if 'ID' in df.columns:
+            df['ID'] = df['ID'].astype(str).str.strip().upper()
+            st.sidebar.success("✅ Datos cargados y optimizados")
+        else:
+            st.sidebar.error(f"Ojo: No veo 'ID'. Veo: {list(df.columns)}")
+            
+    except Exception as e:
+        st.sidebar.error(f"Error técnico: {e}")
+else:
+    st.sidebar.warning("📂 Esperando archivos en GitHub...")
 # --- 5. INTERFAZ DE USUARIO ---
 
 if df is not None and df_maestro is not None:
