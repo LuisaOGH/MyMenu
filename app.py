@@ -14,8 +14,8 @@ def local_css():
     st.markdown(f"""
     <style>
     :root {{
-        --primary: #D14E7B;
-        --secondary: #7E4F8C;
+        --primary: #D14E7B;      /* Rosa */
+        --secondary: #4D243D;    /* Morado Oscuro */
         --bg-cream: #F7F3E9;
         --text: #4D243D;
     }}
@@ -31,10 +31,11 @@ def local_css():
         padding: 10px 25px; width: 100%; font-weight: bold;
     }}
     
-    /* Botón Lista de la Compra (Morado) */
+    /* Botón Lista de la Compra (Morado Oscuro Forzado) */
     div.stButton > button[key="btn_lista"] {{
         background-color: var(--secondary) !important;
-        color: white !important;
+        color: #F7F3E9 !important;
+        border: 2px solid #7E4F8C !important;
     }}
     
     .stSidebar {{ background-color: #EFE6D5; }}
@@ -51,50 +52,35 @@ local_css()
 if 'menu' not in st.session_state: st.session_state['menu'] = None
 if 'en_casa' not in st.session_state: st.session_state['en_casa'] = []
 
-# --- 2. MOTORES DE COLAB (INTEGRADOS) ---
+# --- 2. MOTORES AVANZADOS (A, I, O) ---
 
 def motor_A_avanzado(df):
     df.columns = [c.replace('í', 'i').replace(' ', '_').strip() for c in df.columns]
-    memoria = {'prot': [], 'huevos': 0, 'leg': 0, 'ids': []}
+    memoria = {'ids': []}
     plan = []
     df_a = df[df['ID'].str.contains('A', na=False)].copy()
     df_c = df[df['ID'].str.contains('C', na=False)].copy()
-
     for dia in range(1, 8):
-        opc_a = df_a[~df_a['ID'].isin(memoria['ids'])]
-        if memoria['leg'] >= 3:
-            opc_a = opc_a[~opc_a['Subcategorias_App'].str.contains('Legumbres', na=False)]
-        almuerzo = opc_a.sample(1).iloc[0] if not opc_a.empty else df_a.sample(1).iloc[0]
-        memoria['ids'].append(almuerzo['ID'])
-        memoria['leg'] += 1 if 'Legumbres' in str(almuerzo['Subcategorias_App']) else 0
-        
-        opc_c = df_c[~df_c['ID'].isin(memoria['ids'])]
-        if memoria['huevos'] >= 4:
-            col_b = 'Ingredientes_Base' if 'Ingredientes_Base' in df.columns else 'Ingredientes'
-            opc_c = opc_c[~opc_c[col_b].str.contains('Huevo', na=False)]
-        cena = opc_c.sample(1).iloc[0] if not opc_c.empty else df_c.sample(1).iloc[0]
-        memoria['ids'].append(cena['ID'])
-        memoria['huevos'] += 1 if 'Huevo' in str(cena.get('Ingredientes_Base', '')) else 0
-
+        alm = df_a[~df_a['ID'].isin(memoria['ids'])].sample(1).iloc[0]
+        memoria['ids'].append(alm['ID'])
+        cen = df_c[~df_c['ID'].isin(memoria['ids'])].sample(1).iloc[0]
+        memoria['ids'].append(cen['ID'])
         plan.append({
-            'Día': f'Día {dia}', 'Almuerzo': almuerzo['Nombre'], 'Ing_A': almuerzo['Ingredientes'],
-            'Desc_A': almuerzo.get('Descripcion', 'Sin descripción'),
-            'Cena': cena['Nombre'], 'Ing_C': cena['Ingredientes'],
-            'Desc_C': cena.get('Descripcion', 'Sin descripción')
+            'Día': f'Día {dia}', 'Almuerzo': alm['Nombre'], 'Ing_A': alm['Ingredientes'], 'Desc_A': alm.get('Descripcion', 'Sin descripción'),
+            'Cena': cen['Nombre'], 'Ing_C': cen['Ingredientes'], 'Desc_C': cen.get('Descripcion', 'Sin descripción')
         })
     return pd.DataFrame(plan)
 
-def motor_I_avanzado(df, ingredientes_disponibles, num_dias=3):
+def motor_I_avanzado(df, disponibles, num_dias=3):
     df.columns = [c.replace('í', 'i').replace(' ', '_').strip() for c in df.columns]
-    disponibles = [x.lower().strip() for x in ingredientes_disponibles]
+    disp_l = [x.lower().strip() for x in disponibles]
     def calcular_score(row):
-        return sum(1 for ing in disponibles if ing in str(row.get('Ingredientes_Base', '')).lower())
+        return sum(1 for ing in disp_l if ing in str(row.get('Ingredientes_Base', '')).lower())
     df_scored = df.copy()
     df_scored['Score'] = df_scored.apply(calcular_score, axis=1)
     opc_a = df_scored[df_scored['ID'].str.contains('A', na=False)].sort_values('Score', ascending=False)
     opc_c = df_scored[df_scored['ID'].str.contains('C', na=False)].sort_values('Score', ascending=False)
-    plan = []
-    ids_usados = []
+    plan, ids_usados = [], []
     for i in range(num_dias):
         alm = opc_a[~opc_a['ID'].isin(ids_usados)].iloc[0]
         ids_usados.append(alm['ID'])
@@ -125,10 +111,10 @@ def motor_O_avanzado(df, ultimo_id_num, num_dias=7):
     return pd.DataFrame(plan)
 
 # --- 3. LISTA DE LA COMPRA ---
-def generar_lista_compra_universal_avanzada(df_menu, df_maestro, num_comensales=1, en_casa=None):
+def generar_lista_compra(df_menu, df_maestro, comensales, casa):
     df_maestro.columns = [c.strip() for c in df_maestro.columns]
     mapeo = dict(zip(df_maestro.iloc[:,0].str.lower(), df_maestro.iloc[:,1]))
-    casa = [x.lower().strip() for x in en_casa] if en_casa else []
+    casa_l = [x.lower().strip() for x in casa]
     inventario = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
     
     for _, fila in df_menu.iterrows():
@@ -139,13 +125,13 @@ def generar_lista_compra_universal_avanzada(df_menu, df_maestro, num_comensales=
                 if item == 'nan' or not item: continue
                 match = re.search(r'\(?([\d\.]+)\s*([a-zA-Záéíóú]+)\)?\s+(.*)', item)
                 if match:
-                    cant, uni, nom = float(match.group(1))*num_comensales, match.group(2), match.group(3).strip().capitalize()
-                    if any(c in nom.lower() for c in casa): continue
+                    cant, uni, nom = float(match.group(1))*comensales, match.group(2), match.group(3).strip().capitalize()
+                    if any(c in nom.lower() for c in casa_l): continue
                     pasillo = mapeo.get(nom.lower(), "DESPENSA / OTROS").upper()
                     inventario[pasillo][nom][uni] += cant
                 else:
                     nom_v = item.capitalize()
-                    if not any(c in nom_v.lower() for c in casa): inventario["ESPECIAS / VARIOS"][nom_v]['sin_unidad'] = 1
+                    if not any(c in nom_v.lower() for c in casa_l): inventario["ESPECIAS / VARIOS"][nom_v]['sin_unidad'] = 1
     return inventario
 
 # --- 4. CARGA Y LOGO ---
@@ -154,23 +140,25 @@ st.sidebar.title("MyMenú Selección")
 
 df, df_maestro = None, None
 if os.path.exists("recetas_mymenu.csv") and os.path.exists("maestro_ingredientes.csv"):
-    try:
-        df = pd.read_csv("recetas_mymenu.csv", encoding='latin1', sep=None, engine='python')
-        df_maestro = pd.read_csv("maestro_ingredientes.csv", encoding='latin1', sep=None, engine='python')
-    except: pass
+    df = pd.read_csv("recetas_mymenu.csv", encoding='latin1', sep=None, engine='python')
+    df_maestro = pd.read_csv("maestro_ingredientes.csv", encoding='latin1', sep=None, engine='python')
 
 # --- 5. INTERFAZ ---
 if df is not None and df_maestro is not None:
     modo = st.sidebar.selectbox("Modo", ["Saludable (A)", "Inventario (I)", "Orden (O)"])
     comensales = st.sidebar.slider("Comensales", 1, 6, 2)
     
+    tengo, ultimo_id = [], 0
+    if modo == "Inventario (I)":
+        tengo = st.sidebar.multiselect("¿Qué tienes?", sorted(df_maestro.iloc[:,0].unique().tolist()))
+    elif modo == "Orden (O)":
+        ultimo_id = st.sidebar.number_input("Último número de ID:", min_value=0, step=1)
+
     if st.sidebar.button("🚀 GENERAR"):
         if modo == "Saludable (A)": st.session_state['menu'] = motor_A_avanzado(df)
-        elif modo == "Inventario (I)":
-            ing_opc = sorted(df_maestro.iloc[:,0].unique().tolist())
-            tengo = st.sidebar.multiselect("¿Qué tienes?", ing_opc)
-            if tengo: st.session_state['menu'] = motor_I_avanzado(df, tengo, 3)
-        elif modo == "Orden (O)": st.session_state['menu'] = motor_O_avanzado(df, 0, 7)
+        elif modo == "Inventario (I)": st.session_state['menu'] = motor_I_avanzado(df, tengo, 3)
+        elif modo == "Orden (O)": st.session_state['menu'] = motor_O_avanzado(df, ultimo_id, 7)
+        st.session_state['en_casa'] = tengo
 
     if st.session_state['menu'] is not None:
         st.header("MyMenú")
@@ -181,23 +169,22 @@ if df is not None and df_maestro is not None:
                 @st.dialog(row['Almuerzo'])
                 def m_a():
                     st.image(LOGO_URL, width=150)
-                    st.subheader("Ingredientes")
-                    st.write(row['Ing_A'])
-                    st.subheader("Descripción")
-                    st.write(row['Desc_A'])
+                    st.subheader("🛒 Ingredientes"); st.write(row['Ing_A'])
+                    st.subheader("📝 Descripción"); st.write(row['Desc_A'])
                 m_a()
             if c3.button(row['Cena'], key=f"c{i}"):
                 @st.dialog(row['Cena'])
                 def m_c():
                     st.image(LOGO_URL, width=150)
-                    st.subheader("Ingredientes")
-                    st.write(row['Ing_C'])
-                    st.subheader("Descripción")
-                    st.write(row['Desc_C'])
+                    st.subheader("🛒 Ingredientes"); st.write(row['Ing_C'])
+                    st.subheader("📝 Descripción"); st.write(row['Desc_C'])
                 m_c()
         
+        st.write("---")
+        # EL BOTÓN MORADO OSCURO
         if st.button("🛒 GENERAR LISTA DE LA COMPRA", key="btn_lista"):
-            lista = generar_lista_compra_universal_avanzada(st.session_state['menu'], df_maestro, comensales)
+            lista = generar_lista_compra(st.session_state['menu'], df_maestro, comensales, st.session_state['en_casa'])
+            st.header("Lista de la Compra")
             for cat, ings in sorted(lista.items()):
                 with st.expander(f"📍 {cat}"):
                     for ing, unis in ings.items():
