@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import random
 import re
+import os
 from collections import defaultdict
 
 # --- 1. CONFIGURACIÓN E INYECCIÓN DE ESTILO (BRANDING) ---
@@ -10,35 +11,17 @@ st.set_page_config(page_title="MyMenu App", page_icon="🍴", layout="wide")
 def local_css():
     st.markdown(f"""
     <style>
-    /* Colores MyMenu */
     :root {{
         --primary: #D14E7B;
         --secondary: #7E4F8C;
         --bg-cream: #F7F3E9;
         --text: #4D243D;
     }}
-    .stApp {{
-        background-color: var(--bg-cream);
-        color: var(--text);
-    }}
-    .stButton>button {{
-        background-color: var(--primary);
-        color: white;
-        border-radius: 20px;
-        border: none;
-        padding: 10px 25px;
-    }}
-    .stSidebar {{
-        background-color: #EFE6D5;
-    }}
-    h1, h2, h3 {{
-        color: var(--secondary) !important;
-    }}
-    /* Estilo de tablas */
-    thead tr th {{
-        background-color: var(--secondary) !important;
-        color: white !important;
-    }}
+    .stApp {{ background-color: var(--bg-cream); color: var(--text); }}
+    .stButton>button {{ background-color: var(--primary); color: white; border-radius: 20px; border: none; padding: 10px 25px; }}
+    .stSidebar {{ background-color: #EFE6D5; }}
+    h1, h2, h3 {{ color: var(--secondary) !important; }}
+    thead tr th {{ background-color: var(--secondary) !important; color: white !important; }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -112,15 +95,7 @@ def motor_I(df, disponibles, num_dias):
     for i in range(min(num_dias, len(opciones_a))):
         alm = opciones_a.iloc[i]
         cena = opciones_c.iloc[i]
-        plan.append({
-            'Día': f'Día {i+1}',
-            'Almuerzo': alm['Nombre'],
-            'Cal_A': alm['Calorias'],
-            'Ing_A': alm['Ingredientes'],
-            'Cena': cena['Nombre'],
-            'Cal_C': cena['Calorias'],
-            'Ing_C': cena['Ingredientes']
-        })
+        plan.append({'Día': f'Día {i+1}', 'Almuerzo': alm['Nombre'], 'Cal_A': alm['Calorias'], 'Ing_A': alm['Ingredientes'], 'Cena': cena['Nombre'], 'Cal_C': cena['Calorias'], 'Ing_C': cena['Ingredientes']})
     return pd.DataFrame(plan)
 
 def motor_O(df, ultimo_id, num_dias):
@@ -137,28 +112,32 @@ def motor_O(df, ultimo_id, num_dias):
     for i in range(min(num_dias, len(almuerzos))):
         alm = almuerzos.iloc[i]
         cena = cenas.iloc[i]
-        plan.append({
-            'Día': f'Día {i+1}',
-            'Almuerzo': f"({alm['ID']}) {alm['Nombre']}",
-            'Cal_A': alm['Calorias'],
-            'Ing_A': alm['Ingredientes'],
-            'Cena': f"({cena['ID']}) {cena['Nombre']}",
-            'Cal_C': cena['Calorias'],
-            'Ing_C': cena['Ingredientes']
-        })
+        plan.append({'Día': f'Día {i+1}', 'Almuerzo': f"({alm['ID']}) {alm['Nombre']}", 'Cal_A': alm['Calorias'], 'Ing_A': alm['Ingredientes'], 'Cena': f"({cena['ID']}) {cena['Nombre']}", 'Cal_C': cena['Calorias'], 'Ing_C': cena['Ingredientes']})
     return pd.DataFrame(plan)
 
-# --- 4. INTERFAZ DE USUARIO ---
+# --- 4. CARGA DE DATOS (AUTO O MANUAL) ---
 
 st.sidebar.title("MyMenu Config")
 
-uploaded_recetas = st.sidebar.file_uploader("Subir Recetas (CSV)", type="csv")
-uploaded_maestro = st.sidebar.file_uploader("Subir Maestro Ingredientes (CSV)", type="csv")
+df = None
+df_maestro = None
 
-if uploaded_recetas and uploaded_maestro:
-    df = pd.read_csv(uploaded_recetas)
-    df_maestro = pd.read_csv(uploaded_maestro)
-    
+# Intentar cargar archivos automáticamente desde el repositorio
+if os.path.exists("recetas_mymenu.csv") and os.path.exists("maestro_ingredientes.csv"):
+    df = pd.read_csv("recetas_mymenu.csv")
+    df_maestro = pd.read_csv("maestro_ingredientes.csv")
+    st.sidebar.success("✅ Recetas cargadas de GitHub")
+else:
+    st.sidebar.warning("📂 Sube los CSV manualmente:")
+    uploaded_recetas = st.sidebar.file_uploader("Subir Recetas (CSV)", type="csv")
+    uploaded_maestro = st.sidebar.file_uploader("Subir Maestro Ingredientes (CSV)", type="csv")
+    if uploaded_recetas and uploaded_maestro:
+        df = pd.read_csv(uploaded_recetas)
+        df_maestro = pd.read_csv(uploaded_maestro)
+
+# --- 5. INTERFAZ DE USUARIO ---
+
+if df is not None and df_maestro is not None:
     modo = st.sidebar.selectbox("Modo de Selección", ["Saludable (A)", "Inventario (I)", "Orden (O)"])
     comensales = st.sidebar.slider("Comensales", 1, 6, 2)
     
@@ -195,11 +174,8 @@ if uploaded_recetas and uploaded_maestro:
             for cat, ingredientes in sorted(lista.items()):
                 with st.expander(f"📍 {cat}"):
                     for ing, unis in ingredientes.items():
-                        if 'sin_unidad' in unis:
-                            st.write(f"☐ {ing}")
-                        else:
-                            for u, c in unis.items():
-                                cant_f = int(c) if c.is_integer() else round(c, 2)
-                                st.write(f"☐ {cant_f} {u} de {ing}")
+                        for u, c in unis.items():
+                            cant_f = int(c) if c.is_integer() else round(c, 2)
+                            st.write(f"☐ {cant_f} {u} de {ing}")
 else:
-    st.info("👋 Por favor, sube tus archivos CSV para empezar.")
+    st.info("👋 Por favor, asegúrate de tener 'recetas_mymenu.csv' y 'maestro_ingredientes.csv' en GitHub.")
