@@ -125,7 +125,7 @@ df_maestro = None
 # Intentar cargar archivos automáticamente desde el repositorio
 if os.path.exists("recetas_mymenu.csv") and os.path.exists("maestro_ingredients.csv"):
     df = pd.read_csv("recetas_mymenu.csv", encoding='latin1')
-    df_maestro = pd.read_csv("maestro_ingredients.csv", encoding='latin1')
+    df_maestro = pd.read_csv("maestro_ingredientes.csv", encoding='latin1')
     st.sidebar.success("✅ Recetas cargadas de GitHub")
 else:
     st.sidebar.warning("📂 Sube los CSV manualmente:")
