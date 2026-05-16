@@ -140,8 +140,14 @@ st.sidebar.title("MyMenú Selección")
 
 df, df_maestro = None, None
 if os.path.exists("recetas_mymenu.csv") and os.path.exists("maestro_ingredientes.csv"):
-    df = pd.read_csv("recetas_mymenu.csv", encoding='latin1', sep=None, engine='python')
-    df_maestro = pd.read_csv("maestro_ingredientes.csv", encoding='latin1', sep=None, engine='python')
+    try:
+        # Probamos primero con utf-8-sig (estándar de Excel para tildes)
+        df = pd.read_csv("recetas_mymenu.csv", encoding='utf-8-sig', sep=None, engine='python')
+        df_maestro = pd.read_csv("maestro_ingredientes.csv", encoding='utf-8-sig', sep=None, engine='python')
+    except UnicodeDecodeError:
+        # Si falla, usamos latin1 como plan B
+        df = pd.read_csv("recetas_mymenu.csv", encoding='latin1', sep=None, engine='python')
+        df_maestro = pd.read_csv("maestro_ingredientes.csv", encoding='latin1', sep=None, engine='python')
 
 # --- 5. INTERFAZ ---
 if df is not None and df_maestro is not None:
