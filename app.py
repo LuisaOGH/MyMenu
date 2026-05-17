@@ -3,6 +3,7 @@ import pandas as pd
 import re
 import os
 import random
+import base64
 from collections import defaultdict
 
 # --- 1. CONFIGURACIÓN Y ESTILO ---
@@ -99,6 +100,21 @@ def motor_logica(df, modo, n_dias=7, datos_extra=None):
         cens = df_copy[df_copy['ID_str'].str.contains('C', case=False, na=False)].sample(frac=1)
 
     return normalizar_resultado(alms, cens, n_dias)
+
+def crear_pdf_descargable(df_menu, n_personas):
+    # Creamos un HTML sencillo para el PDF
+    html_content = f"<h1>MyMenú Semanal (para {n_personas} personas)</h1>"
+    for _, fila in df_menu.iterrows():
+        html_content += f"<h3>Día {fila['Día']}</h3>"
+        html_content += f"<p><b>Almuerzo:</b> {fila['Almuerzo']['Nombre']}</p>"
+        html_content += f"<p><b>Cena:</b> {fila['Cena']['Nombre']}</p><hr>"
+    
+    # Esto genera un link de descarga directa
+    b64 = base64.b64encode(html_content.encode()).decode()
+    href = f'<a href="data:text/html;base64,{b64}" download="menu_semanal.html" style="text-decoration:none;">' \
+           f'<div style="background-color:#4D243D;color:white;padding:15px;border-radius:10px;text-align:center;font-weight:bold;">' \
+           f'📥 DESCARGAR PLANING PARA COMPARTIR</div></a>'
+    return href
 
 # --- 4. CARGA DE DATOS ---
 @st.cache_data
@@ -205,6 +221,7 @@ elif st.session_state['paso'] == 'menu':
                 st.write(f"☐ {item.capitalize()}")
 
     st.write("<br>", unsafe_allow_html=True)
+    st.markdown(crear_pdf_descargable(st.session_state['menu'], n), unsafe_allow_html=True)
     if st.button("⬅️ VOLVER A SELECCIÓN"):
         st.session_state['paso'] = 'configurar'
         st.rerun()
