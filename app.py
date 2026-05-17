@@ -37,34 +37,88 @@ if 'paso' not in st.session_state: st.session_state['paso'] = 'inicio'
 if 'menu' not in st.session_state: st.session_state['menu'] = None
 if 'comensales' not in st.session_state: st.session_state['comensales'] = 2
 
-# --- 3. FUNCIONES TÉCNICAS ---
+# --- 3. FUNCIONES TÉCNICAS (CORREGIDAS) ---
 
 def escalar_cantidades(texto, n):
-    if pd.isna(texto): return "Ingredientes no disponibles"
+    if pd.isna(texto): return ""
+    # Esta función busca números y los multiplica por el número de comensales
     return re.sub(r'(\d+(?:\.\d+)?)', lambda m: str(round(float(m.group(1)) * n, 2)), str(texto))
 
-def normalizar_df(df_parcial, num_dias):
-    """Convierte cualquier selección de recetas en la estructura Día/Almuerzo/Cena"""
-    # Separar almuerzos y cenas
-    alms_raw = df_parcial[df_parcial['ID'].str.contains('A', na=False, case=False)]
-    cens_raw = df_parcial[df_parcial['ID'].str.contains('C', na=False, case=False)]
+def motor_O_orden(df, ultimo_id):
+    # BLINDAJE: Convertimos ID a string y limpiamos antes de extraer el número
+    df['ID'] = df['ID'].astype(str).fillna('')
+    df['n_id'] = df['ID'].str.extract(r'(\d+)').fillna(0).astype(int)
     
-    if len(alms_raw) < 1 or len(cens_raw) < 1:
-        return None # No hay suficientes recetas
+    proximas = df[df['n_id'] > ultimo_id].sort_values('n_id')
+    return normalizar_df(proximas, 7)
 
-    num_final = min(num_dias, len(alms_raw), len(cens_raw))
-    df_a = alms_raw.sample(num_final).reset_index(drop=True)
-    df_c = cens_raw.sample(num_final).reset_index(drop=True)
+def generar_lista_compra_categorizada(df_menu, df_maestro, n):
+    # Diccionario: Categoría -> Producto -> Cantidad total
+    compra = defaultdict(lambda: defaultdict(float))
+    # Creamos un mapa de Producto -> Categoría desde tu maestro
+    mapeo_categorias = dict(zip(df_maestro.iloc[:,0].str.lower(), df_maestro.iloc[:,1]))
     
-    plan = []
-    for i in range(num_final):
-        plan.append({
-            'Día': f'Día {i+1}',
-            'Almuerzo': df_a.iloc[i].to_dict(),
-            'Cena': df_c.iloc[i].to_dict()
-        })
-    return pd.DataFrame(plan)
+    for _, fila in df_menu.iterrows():
+        for tipo in ['Almuerzo', 'Cena']:
+            receta = fila[tipo]
+            ingredientes_raw = str(receta.get('Ingredientes', '')).split(',')
+            
+            for ing in ingredientes_raw:
+                # Extraer cantidad y nombre (ej: "200 g arroz" -> cant=200, resto="g arroz")
+                match = re.search(r'(\d+(?:\.\d+)?)', ing)
+                if match:
+                    cantidad = float(match.group(1)) * n
+                    nombre_ing = ing.replace(match.group(1), '').strip().lower()
+                else:
+                    cantidad = 0 # Para ingredientes sin número (ej: "Sal")
+                    nombre_ing = ing.strip().lower()
+                
+                # Buscar categoría en el maestro
+                cat = "OTROS"
+                for prod_maestro, categoria in mapeo_categorias.items():
+                    if prod_maestro in nombre_ing:
+                        cat = categoria.upper()
+                        break
+                
+                compra[cat][ing.strip().capitalize()] += cantidad
+                
+    return compra
 
+# --- PANTALLA DE MENÚ Y DETALLE ---
+
+if st.session_state['paso'] == 'menu':
+    st.markdown(f'<div style="text-align:center"><img src="{LOGO_RECORTADO}" width="100"></div>', unsafe_allow_html=True)
+    n = st.session_state['comensales']
+    
+    for i, row in st.session_state['menu'].iterrows():
+        st.write(f"### {row['Día']}")
+        c1, c2 = st.columns(2)
+        
+        for col, receta, llave in [(c1, row['Almuerzo'], 'A'), (c2, row['Cena'], 'C')]:
+            # El botón solo muestra el nombre
+            if col.button(f"{receta['Nombre']}", key=f"{llave}{i}"):
+                @st.dialog(receta['Nombre'])
+                def mostrar_detalle(r=receta):
+                    st.image(LOGO_RECORTADO, width=80)
+                    st.write(f"🕒 **Tiempo:** {r.get('Tiempo', '25 min')} | 🔥 **Calorías:** {r.get('Calorias', 'N/A')}")
+                    st.divider()
+                    st.subheader("🛒 Ingredientes (para {} personas)".format(n))
+                    st.write(escalar_cantidades(r.get('Ingredientes',''), n))
+                    st.subheader("👨‍🍳 Preparación")
+                    st.write(r.get('Descripcion', 'Consulta el PDF para el paso a paso.'))
+                mostrar_detalle()
+
+    # --- LISTA DE LA COMPRA POR CATEGORÍAS ---
+    st.divider()
+    st.header("🛒 Tu Lista de la Compra")
+    if df_maestro is not None:
+        lista_cat = generar_lista_compra_categorizada(st.session_state['menu'], df_maestro, n)
+        for cat in sorted(lista_cat.keys()):
+            with st.expander(f"📍 {cat}"):
+                for ing_nombre, total in lista_cat[cat].items():
+                    # Si el total es 0, solo mostramos el nombre
+                    check_text = f"{ing_nombre}" if total == 0 else f"{escalar_cantidades(ing_nombre, n)}"
+                    st.write(f"☐ {check_text}")
 # --- 4. CARGA DE DATOS ---
 @st.cache_data
 def cargar_datos():
