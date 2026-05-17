@@ -8,191 +8,147 @@ from collections import defaultdict
 # --- 1. CONFIGURACIÓN Y ESTILO ---
 st.set_page_config(page_title="MyMenú", page_icon="🍴", layout="wide")
 
-LOGO_URL = "https://raw.githubusercontent.com/LuisaOGH/MyMenu/main/logo.png"
+# URLs de activos
+LOGO_RECORTADO = "https://raw.githubusercontent.com/LuisaOGH/MyMenu/main/logo_recortado.jpg"
+LOGO_FULL = "https://raw.githubusercontent.com/LuisaOGH/MyMenu/main/logo.png"
 
 def local_css():
     st.markdown(f"""
     <style>
     :root {{
-        --primary: #D14E7B;      /* Rosa */
-        --secondary: #4D243D;    /* Morado Oscuro */
+        --primary: #D14E7B;
+        --secondary: #4D243D;
         --bg-cream: #F7F3E9;
-        --text: #4D243D;
     }}
-    .stApp {{ background-color: var(--bg-cream); color: var(--text); }}
+    .stApp {{ background-color: var(--bg-cream); }}
     
-    /* Logo ancho total móvil */
-    [data-testid="stImage"] img {{ width: 100%; height: auto; border-radius: 0px; }}
+    /* Centrado de Logo */
+    .logo-container {{
+        display: flex;
+        justify-content: center;
+        padding: 10px;
+    }}
+    .logo-img {{ width: 150px; border-radius: 50%; }}
 
-    /* Botón Generar (Rosa) */
-    .stButton>button {{ 
-        background-color: var(--primary); 
-        color: white; border-radius: 20px; border: none; 
-        padding: 10px 25px; width: 100%; font-weight: bold;
+    /* Botones Modernos */
+    .stButton>button {{
+        border-radius: 25px;
+        font-weight: bold;
+        transition: 0.3s;
     }}
     
-    /* Botón Lista de la Compra (Morado Oscuro Forzado) */
-    div.stButton > button[key="btn_lista"] {{
-        background-color: var(--secondary) !important;
-        color: #F7F3E9 !important;
-        border: 2px solid #7E4F8C !important;
-    }}
-    
-    .stSidebar {{ background-color: #EFE6D5; }}
-    h1, h2, h3 {{ color: var(--secondary) !important; text-align: center; }}
-    
-    /* Limpieza visual: Ocultar alertas de éxito */
+    /* Ocultar mensajes de éxito de Streamlit para limpieza */
     .element-container:has(.stAlert) {{ display: none; }}
     </style>
     """, unsafe_allow_html=True)
 
 local_css()
 
-# Inicialización de estados
-if 'menu' not in st.session_state: st.session_state['menu'] = None
-if 'en_casa' not in st.session_state: st.session_state['en_casa'] = []
-
-# --- 2. MOTORES AVANZADOS (A, I, O) ---
+# --- 2. MOTORES DE SELECCIÓN CORREGIDOS ---
 
 def motor_A_avanzado(df):
-    df.columns = [c.replace('í', 'i').replace(' ', '_').strip() for c in df.columns]
-    memoria = {'ids': []}
-    plan = []
-    df_a = df[df['ID'].str.contains('A', na=False)].copy()
-    df_c = df[df['ID'].str.contains('C', na=False)].copy()
-    for dia in range(1, 8):
-        alm = df_a[~df_a['ID'].isin(memoria['ids'])].sample(1).iloc[0]
-        memoria['ids'].append(alm['ID'])
-        cen = df_c[~df_c['ID'].isin(memoria['ids'])].sample(1).iloc[0]
-        memoria['ids'].append(cen['ID'])
-        plan.append({
-            'Día': f'Día {dia}', 'Almuerzo': alm['Nombre'], 'Ing_A': alm['Ingredientes'], 'Desc_A': alm.get('Descripcion', 'Sin descripción'),
-            'Cena': cen['Nombre'], 'Ing_C': cen['Ingredientes'], 'Desc_C': cen.get('Descripcion', 'Sin descripción')
-        })
-    return pd.DataFrame(plan)
-
-def motor_I_avanzado(df, disponibles, num_dias=3):
-    df.columns = [c.replace('í', 'i').replace(' ', '_').strip() for c in df.columns]
-    disp_l = [x.lower().strip() for x in disponibles]
-    def calcular_score(row):
-        return sum(1 for ing in disp_l if ing in str(row.get('Ingredientes_Base', '')).lower())
-    df_scored = df.copy()
-    df_scored['Score'] = df_scored.apply(calcular_score, axis=1)
-    opc_a = df_scored[df_scored['ID'].str.contains('A', na=False)].sort_values('Score', ascending=False)
-    opc_c = df_scored[df_scored['ID'].str.contains('C', na=False)].sort_values('Score', ascending=False)
-    plan, ids_usados = [], []
-    for i in range(num_dias):
-        alm = opc_a[~opc_a['ID'].isin(ids_usados)].iloc[0]
-        ids_usados.append(alm['ID'])
-        cen = opc_c[~opc_c['ID'].isin(ids_usados)].iloc[0]
-        ids_usados.append(cen['ID'])
-        plan.append({
-            'Día': f'Día {i+1}', 'Almuerzo': alm['Nombre'], 'Ing_A': alm['Ingredientes'], 'Desc_A': alm.get('Descripcion', 'Sin descripción'),
-            'Cena': cen['Nombre'], 'Ing_C': cen['Ingredientes'], 'Desc_C': cen.get('Descripcion', 'Sin descripción')
-        })
-    return pd.DataFrame(plan)
-
-def motor_O_avanzado(df, ultimo_id_num, num_dias=7):
-    df_temp = df.copy()
-    df_temp.columns = [c.replace('í', 'i').replace(' ', '_').strip() for c in df_temp.columns]
-    df_temp['n_id'] = df_temp['ID'].str.extract(r'(\d+)').fillna(0).astype(int)
-    es_impar = ultimo_id_num % 2 != 0
-    serie = df_temp[df_temp['n_id'] % 2 != (0 if es_impar else 1)].sort_values('n_id')
-    opc = serie[serie['n_id'] > ultimo_id_num]
-    alms = opc[opc['ID'].str.contains('A')]
-    cens = opc[opc['ID'].str.contains('C')]
-    plan = []
-    for i in range(min(num_dias, len(alms), len(cens))):
-        alm, cen = alms.iloc[i], cens.iloc[i]
-        plan.append({
-            'Día': f'Día {i+1}', 'Almuerzo': f"({alm['ID']}) {alm['Nombre']}", 'Ing_A': alm['Ingredientes'], 'Desc_A': alm.get('Descripcion', 'Sin descripción'),
-            'Cena': f"({cen['ID']}) {cen['Nombre']}", 'Ing_C': cen['Ingredientes'], 'Desc_C': cen.get('Descripcion', 'Sin descripción')
-        })
-    return pd.DataFrame(plan)
-
-# --- 3. LISTA DE LA COMPRA ---
-def generar_lista_compra(df_menu, df_maestro, comensales, casa):
-    df_maestro.columns = [c.strip() for c in df_maestro.columns]
-    mapeo = dict(zip(df_maestro.iloc[:,0].str.lower(), df_maestro.iloc[:,1]))
-    casa_l = [x.lower().strip() for x in casa]
-    inventario = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
+    df.columns = [c.strip() for c in df.columns]
+    df_a = df[df['ID'].str.contains('A', na=False)]
+    df_c = df[df['ID'].str.contains('C', na=False)]
     
-    for _, fila in df_menu.iterrows():
-        for col in ['Ing_A', 'Ing_C']:
-            items = str(fila[col]).split(',')
-            for item in items:
-                item = item.strip().lower()
-                if item == 'nan' or not item: continue
-                match = re.search(r'\(?([\d\.]+)\s*([a-zA-Záéíóú]+)\)?\s+(.*)', item)
-                if match:
-                    cant, uni, nom = float(match.group(1))*comensales, match.group(2), match.group(3).strip().capitalize()
-                    if any(c in nom.lower() for c in casa_l): continue
-                    pasillo = mapeo.get(nom.lower(), "DESPENSA / OTROS").upper()
-                    inventario[pasillo][nom][uni] += cant
-                else:
-                    nom_v = item.capitalize()
-                    if not any(c in nom_v.lower() for c in casa_l): inventario["ESPECIAS / VARIOS"][nom_v]['sin_unidad'] = 1
-    return inventario
+    plan = []
+    # Seleccionamos 7 días al azar sin repetir
+    alms = df_a.sample(7).reset_index()
+    cens = df_c.sample(7).reset_index()
+    
+    for i in range(7):
+        plan.append({
+            'Día': f'Día {i+1}', 
+            'Almuerzo': alms.loc[i, 'Nombre'], 'Ing_A': alms.loc[i, 'Ingredientes'], 'Desc_A': alms.loc[i].get('Descripcion', 'Ver PDF'),
+            'Cena': cens.loc[i, 'Nombre'], 'Ing_C': cens.loc[i, 'Ingredientes'], 'Desc_C': cens.loc[i].get('Descripcion', 'Ver PDF')
+        })
+    return pd.DataFrame(plan)
 
-# --- 4. CARGA Y LOGO ---
-st.image(LOGO_URL, use_container_width=True)
-st.sidebar.title("MyMenú Selección")
+def motor_I_avanzado(df, disponibles):
+    """Motor I Corregido: Ahora mezcla aleatoriedad con los mejores matches"""
+    df.columns = [c.strip() for c in df.columns]
+    disp_l = [x.lower().strip() for x in disponibles]
+    
+    def calcular_score(row):
+        # Puntuamos según cuántos ingredientes del stock coinciden
+        return sum(1 for ing in disp_l if ing in str(row.get('Ingredientes', '')).lower())
+    
+    df['Score'] = df.apply(calcular_score, axis=1)
+    
+    # Filtramos las mejores (Score > 0 si hay stock, o simplemente las mejores disponibles)
+    opc_a = df[df['ID'].str.contains('A', na=False)].nlargest(10, 'Score')
+    opc_c = df[df['ID'].str.contains('C', na=False)].nlargest(10, 'Score')
+    
+    # De las 10 mejores, elegimos 3 al azar para que el menú cambie
+    alms = opc_a.sample(min(3, len(opc_a))).reset_index()
+    cens = opc_c.sample(min(3, len(opc_c))).reset_index()
+    
+    plan = []
+    for i in range(len(alms)):
+        plan.append({
+            'Día': f'Día {i+1}', 
+            'Almuerzo': alms.loc[i, 'Nombre'], 'Ing_A': alms.loc[i, 'Ingredientes'], 'Desc_A': alms.loc[i].get('Descripcion', 'Ver PDF'),
+            'Cena': cens.loc[i, 'Nombre'], 'Ing_C': cens.loc[i, 'Ingredientes'], 'Desc_C': cens.loc[i].get('Descripcion', 'Ver PDF')
+        })
+    return pd.DataFrame(plan)
 
+# --- 3. LÓGICA TÉCNICA: ESCALADO DE CANTIDADES ---
+def escalar_texto(texto, n):
+    if pd.isna(texto): return ""
+    def mult(match):
+        return str(round(float(match.group(1)) * n, 2))
+    return re.sub(r'(\d+(?:\.\d+)?)', mult, texto)
+
+# --- 4. CARGA Y UI ---
 df, df_maestro = None, None
 if os.path.exists("recetas_mymenu.csv") and os.path.exists("maestro_ingredientes.csv"):
-    try:
-        # Probamos primero con utf-8-sig (estándar de Excel para tildes)
-        df = pd.read_csv("recetas_mymenu.csv", encoding='utf-8-sig', sep=None, engine='python')
-        df_maestro = pd.read_csv("maestro_ingredientes.csv", encoding='utf-8-sig', sep=None, engine='python')
-    except UnicodeDecodeError:
-        # Si falla, usamos latin1 como plan B
-        df = pd.read_csv("recetas_mymenu.csv", encoding='latin1', sep=None, engine='python')
-        df_maestro = pd.read_csv("maestro_ingredientes.csv", encoding='latin1', sep=None, engine='python')
+    df = pd.read_csv("recetas_mymenu.csv", encoding='utf-8-sig', sep=None, engine='python')
+    df_maestro = pd.read_csv("maestro_ingredientes.csv", encoding='utf-8-sig', sep=None, engine='python')
 
-# --- 5. INTERFAZ ---
-if df is not None and df_maestro is not None:
-    modo = st.sidebar.selectbox("Modo", ["Saludable (A)", "Inventario (I)", "Orden (O)"])
+# Mostrar Logo Recortado centrado (Siempre arriba)
+st.markdown(f'<div class="logo-container"><img src="{LOGO_RECORTADO}" class="logo-img"></div>', unsafe_allow_html=True)
+
+if df is not None:
+    # Sidebar
+    st.sidebar.header("Configuración")
+    modo = st.sidebar.selectbox("¿Cómo planificamos?", ["Saludable (A)", "Inventario (I)", "Orden (O)"])
     comensales = st.sidebar.slider("Comensales", 1, 6, 2)
     
-    tengo, ultimo_id = [], 0
+    tengo = []
     if modo == "Inventario (I)":
-        tengo = st.sidebar.multiselect("¿Qué tienes?", sorted(df_maestro.iloc[:,0].unique().tolist()))
-    elif modo == "Orden (O)":
-        ultimo_id = st.sidebar.number_input("Último número de ID:", min_value=0, step=1)
+        tengo = st.sidebar.multiselect("¿Qué tienes en la cocina?", sorted(df_maestro.iloc[:,0].unique().tolist()))
 
-    if st.sidebar.button("🚀 GENERAR"):
+    if st.sidebar.button("🚀 GENERAR MI PLAN"):
         if modo == "Saludable (A)": st.session_state['menu'] = motor_A_avanzado(df)
-        elif modo == "Inventario (I)": st.session_state['menu'] = motor_I_avanzado(df, tengo, 3)
-        elif modo == "Orden (O)": st.session_state['menu'] = motor_O_avanzado(df, ultimo_id, 7)
-        st.session_state['en_casa'] = tengo
+        elif modo == "Inventario (I)": st.session_state['menu'] = motor_I_avanzado(df, tengo)
+        st.session_state['comensales'] = comensales
 
-    if st.session_state['menu'] is not None:
-        st.header("MyMenú")
+    # --- 5. RENDERIZADO DEL MENÚ ---
+    if 'menu' in st.session_state and st.session_state['menu'] is not None:
+        n = st.session_state.get('comensales', 1)
         for i, row in st.session_state['menu'].iterrows():
-            c1, c2, c3 = st.columns([1, 2, 2])
-            c1.write(f"**{row['Día']}**")
-            if c2.button(row['Almuerzo'], key=f"a{i}"):
-                @st.dialog(row['Almuerzo'])
-                def m_a():
-                    st.image(LOGO_URL, width=150)
-                    st.subheader("🛒 Ingredientes"); st.write(row['Ing_A'])
-                    st.subheader("📝 Descripción"); st.write(row['Desc_A'])
-                m_a()
-            if c3.button(row['Cena'], key=f"c{i}"):
-                @st.dialog(row['Cena'])
-                def m_c():
-                    st.image(LOGO_URL, width=150)
-                    st.subheader("🛒 Ingredientes"); st.write(row['Ing_C'])
-                    st.subheader("📝 Descripción"); st.write(row['Desc_C'])
-                m_c()
-        
-        st.write("---")
-        # EL BOTÓN MORADO OSCURO
-        if st.button("🛒 GENERAR LISTA DE LA COMPRA", key="btn_lista"):
-            lista = generar_lista_compra(st.session_state['menu'], df_maestro, comensales, st.session_state['en_casa'])
-            st.header("Lista de la Compra")
-            for cat, ings in sorted(lista.items()):
-                with st.expander(f"📍 {cat}"):
-                    for ing, unis in ings.items():
-                        for u, c in unis.items():
-                            st.write(f"☐ {int(c) if c.is_integer() else c} {u} de {ing}" if u != 'sin_unidad' else f"☐ {ing}")
+            with st.container():
+                c1, c2, c3 = st.columns([1, 2, 2])
+                c1.subheader(row['Día'])
+                
+                # Botones de platos
+                if c2.button(f"🥗 {row['Almuerzo']}", key=f"a{i}"):
+                    @st.dialog(row['Almuerzo'])
+                    def modal_a():
+                        st.write(f"**Cantidades para {n} personas:**")
+                        st.info(escalar_texto(row['Ing_A'], n))
+                        st.write("**Preparación:**", row['Desc_A'])
+                    modal_a()
+
+                if c3.button(f"🌙 {row['Cena']}", key=f"c{i}"):
+                    @st.dialog(row['Cena'])
+                    def modal_c():
+                        st.write(f"**Cantidades para {n} personas:**")
+                        st.info(escalar_texto(row['Ing_C'], n))
+                        st.write("**Preparación:**", row['Desc_C'])
+                    modal_c()
+    else:
+        # Si no hay menú, mostramos el logo con eslogan grande para dar la bienvenida
+        st.image(LOGO_FULL, use_container_width=True)
+else:
+    st.error("Error: Sube los archivos CSV al repositorio.")
