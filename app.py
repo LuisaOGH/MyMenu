@@ -8,6 +8,7 @@ from collections import defaultdict
 # --- 1. CONFIGURACIÓN Y ESTILO ---
 st.set_page_config(page_title="MyMenú", page_icon="🍴", layout="wide")
 
+# URLs - Asegúrate de que estas rutas sean las correctas en tu GitHub
 LOGO_FULL = "https://raw.githubusercontent.com/LuisaOGH/MyMenu/main/logo.png"
 LOGO_RECORTADO = "https://raw.githubusercontent.com/LuisaOGH/MyMenu/main/logo_recortado.jpg"
 
@@ -42,14 +43,14 @@ def local_css():
         border-radius: 10px !important;
     }}
     
-    /* Contenedor para centrar el logo */
-    .logo-container {{
-        display: flex;
-        justify-content: center;
-        margin-bottom: 10px;
-    }}
-    
     h1, h2, h3, h4 {{ color: var(--morado) !important; text-align: center; }}
+    
+    /* Forzar que el diálogo no oculte las imágenes */
+    div[data-st-mode="dialog"] img {{
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+    }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -123,7 +124,10 @@ df_recetas, df_maestro = cargar_datos()
 
 # PANTALLA 1: INICIO
 if st.session_state['paso'] == 'inicio':
-    st.image(LOGO_FULL, use_container_width=True)
+    # Usamos columnas para centrar la imagen manualmente
+    col_a, col_center, col_b = st.columns([1, 4, 1])
+    with col_center:
+        st.image(LOGO_FULL, use_container_width=True)
     st.write("<br>", unsafe_allow_html=True)
     if st.button("CONFIGURAR MI MENÚ"):
         st.session_state['paso'] = 'configurar'
@@ -131,9 +135,9 @@ if st.session_state['paso'] == 'inicio':
 
 # PANTALLA 2: SELECCIÓN
 elif st.session_state['paso'] == 'configurar':
-    # Logo corregido con st.image
-    col_l, col_r, col_ex = st.columns([1, 2, 1])
-    with col_r: st.image(LOGO_RECORTADO, width=120)
+    col_l, col_center, col_r = st.columns([3, 2, 3])
+    with col_center:
+        st.image(LOGO_RECORTADO, width=150)
     
     st.header("Configura tu semana")
     
@@ -160,9 +164,9 @@ elif st.session_state['paso'] == 'configurar':
 
 # PANTALLA 3: MENÚ
 elif st.session_state['paso'] == 'menu':
-    # Logo corregido con st.image
-    col_l, col_r, col_ex = st.columns([1, 2, 1])
-    with col_r: st.image(LOGO_RECORTADO, width=120)
+    col_l, col_center, col_r = st.columns([3, 1, 3])
+    with col_center:
+        st.image(LOGO_RECORTADO, width=100)
     
     st.header("Tu Menú Semanal")
     n = st.session_state['comensales']
@@ -173,8 +177,10 @@ elif st.session_state['paso'] == 'menu':
         
         @st.dialog("Detalle de la Receta")
         def mostrar_ficha(datos):
-            # Logo corregido dentro del diálogo
-            st.image(LOGO_RECORTADO, width=80)
+            # Logo centrado dentro del detalle
+            c1, c2, c3 = st.columns([2, 1, 2])
+            with c2: st.image(LOGO_RECORTADO, width=80)
+            
             st.subheader(datos['Nombre'])
             st.write(f"⏱️ **Tiempo:** {datos.get('Tiempo', '25')} min | 🔥 **Calorías:** {datos.get('Calorias', 'N/A')}")
             st.divider()
