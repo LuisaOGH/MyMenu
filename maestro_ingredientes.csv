@@ -1,0 +1,109 @@
+Ingrediente_Base;Categoria;Subcategoria
+Pollo;Proteína;Carnes Blancas
+Pavo;Proteína;Carnes Blancas
+Pavo (picado);Proteína;Carnes Blancas
+Ternera;Proteína;Carnes Rojas
+Ternera (picada);Proteína;Carnes Rojas
+Cerdo;Proteína;Carnes Rojas
+Merluza;Proteína;Pescado Blanco
+Bacalao;Proteína;Pescado Blanco
+Dorada;Proteína;Pescado Blanco
+Lubina;Proteína;Pescado Blanco
+Trucha;Proteína;Pescado Blanco
+Sepia;Proteína;Marisco
+Salmón;Proteína;Pescado Azul
+Samón Ahumado;Proteína;Pescado Azul
+Atún;Proteína;Pescado Azul
+Atún (lata);Proteína;Pescado Azul
+Anchoas;Proteína;Pescado Azul
+Sardinas;Proteína;Pescado Azul
+Boquerones;Proteína;Pescado Azul
+Gambas;Proteína;Marisco
+Langostinos;Proteína;Marisco
+Huevo;Proteína;Huevos
+Lentejas;Proteína;Legumbres
+Garbanzos;Proteína;Legumbres
+Alubias;Proteína;Legumbres
+Calabacín;Vegetal;Hortalizas
+Berenjena;Vegetal;Hortalizas
+Tomate;Vegetal;Hortalizas
+Tomate Cherry;Vegetal;Hortalizas
+Pimiento Rojo;Vegetal;Hortalizas
+Pimiento Verde;Vegetal;Hortalizas
+Pimiento Piquillo;Vegetal;Hortalizas
+Zanahoria;Vegetal;Hortalizas
+Pepino;Vegetal;Hortalizas
+Calabaza;Vegetal;Hortalizas
+Maíz;Vegetal;Hortalizas
+Edamame;Vegetal;Hortalizas
+Judías Verdes;Vegetal;Hortalizas
+Guisantes;Vegetal;Hortalizas
+Espinacas;Vegetal;Hoja Verde
+Lechuga;Vegetal;Hoja Verde
+Acelgas;Vegetal;Hoja Verde
+Rúcula;Vegetal;Hoja Verde
+Canónigos;Vegetal;Hoja Verde
+Ensalada;Vegetal;Hoja Verde
+Ajetes;Vegetal;Hoja Verde
+Brócoli;Vegetal;Crucíferas
+Coliflor;Vegetal;Crucíferas
+Col;Vegetal;Crucíferas
+Espárragos;Vegetal;Tallos
+Espárragos Blancos;Vegetal;Tallos
+Puerro;Vegetal;Bulbos
+Cebolla;Vegetal;Bulbos
+Ajo;Vegetal;Bulbos
+Champiñones;Vegetal;Setas
+Setas;Vegetal;Setas
+Alcachofas;Vegetal;Hortalizas
+Aguacate;Fruta;Grasas
+Mango;Fruta;Dulce
+Piña;Fruta;Ácida
+Manzana;Fruta;Dulce
+Fresas;Fruta;Frutos Rojos
+Melón;Fruta;Dulce
+Limón;Fruta;Cítrico
+Naranja;Fruta;Cítrico
+Pera;Fruta;Dulce
+Almendras;Grasas;Frutos Secos
+Nueces;Grasas;Frutos Secos
+Pistachos;Grasas;Frutos Secos
+Piñones;Grasas;Frutos Secos
+Pipas de Calabaza;Grasas;Frutos Secos
+Pipas Girasol;Grasas;Frutos Secos
+Cacahuetes;Grasas;Frutos Secos
+Harina Almendra;Grasas;Frutos Secos
+Sésamo;Grasas;Semillas
+Chía;Grasas;Semillas
+Jengibre;Grasas;Semillas
+Aceitunas;Grasas;Frutos
+Alcaparras;Grasas;Frutos
+AOVE;Grasas;Aceites
+Queso;Lácteo;Quesos
+Queso Feta;Lácteo;Quesos
+Queso rallado;Lácteo;Quesos
+Queso Cabra;Lácteo;Quesos
+Queso lonchas;Lácteo;Quesos
+Queso crema;Lácteo;Quesos
+Queso Rouefort;Lácteo;Quesos
+Queso Burrata;Lácteo;Quesos
+Queso Ricotta;Lácteo;Quesos
+Yogur;Lácteo;Yogures
+Leche de coco;Despensa;Líquidos
+Leche evaporada;Despensa;Líquidos
+Caldo;Despensa;Bases
+Hummus;Despensa;Bases
+Tahiní;Despensa;Bases
+Tomate Triturado;Despensa;Bases
+Mostaza;Despensa;Bases
+Miel;Despensa;Bases
+Arroz;Carbohidrato;Cereales
+Fideos de Arroz;Carbohidrato;Cereales
+Quinoa;Carbohidrato;Cereales
+Patata;Carbohidrato;Tubérculos
+Pan;Carbohidrato;Cereales
+Especias;Despensa;Condimentos
+Soja;Despensa;Salsas
+Jamón Serrano (lonchas);Proteína;Embutidos
+Jamón Serrano (taquitos);Proteína;Embutidos
+Jamón Cocido;Proteína;Embutidos
