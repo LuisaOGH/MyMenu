@@ -8,9 +8,8 @@ from collections import defaultdict
 # --- 1. CONFIGURACIÓN Y ESTILO ---
 st.set_page_config(page_title="MyMenú", page_icon="🍴", layout="wide")
 
-# URLs - Asegúrate de que estas rutas sean las correctas en tu GitHub
+# Solo mantenemos el logo principal para la pantalla de inicio
 LOGO_FULL = "https://raw.githubusercontent.com/LuisaOGH/MyMenu/main/logo.png"
-LOGO_RECORTADO = "https://raw.githubusercontent.com/LuisaOGH/MyMenu/main/logo_recortado.jpg"
 
 def local_css():
     st.markdown(f"""
@@ -22,7 +21,7 @@ def local_css():
     }}
     .stApp {{ background-color: var(--bg-cream); }}
     
-    /* Botones de acción (Morado) */
+    /* Botones de acción GRANDES (Morado) */
     div.stButton > button {{
         background-color: var(--morado) !important;
         color: white !important;
@@ -41,16 +40,10 @@ def local_css():
         font-size: 16px !important;
         padding: 12px !important;
         border-radius: 10px !important;
+        border: none !important;
     }}
     
-    h1, h2, h3, h4 {{ color: var(--morado) !important; text-align: center; }}
-    
-    /* Forzar que el diálogo no oculte las imágenes */
-    div[data-st-mode="dialog"] img {{
-        display: block;
-        margin-left: auto;
-        margin-right: auto;
-    }}
+    h1, h2, h3, h4 {{ color: var(--morado) !important; text-align: center; font-family: sans-serif; }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -92,7 +85,7 @@ def motor_logica(df, modo, n_dias=7, datos_extra=None):
     elif modo == "Inventario (I)":
         def calcular_puntos(row):
             count = 0
-            ing_receta = str(row['Ingredientes']).lower()
+            ing_receta = str(row.get('Ingredientes', '')).lower()
             for ing in datos_extra:
                 if ing.lower() in ing_receta: count += 1
             return count
@@ -124,10 +117,7 @@ df_recetas, df_maestro = cargar_datos()
 
 # PANTALLA 1: INICIO
 if st.session_state['paso'] == 'inicio':
-    # Usamos columnas para centrar la imagen manualmente
-    col_a, col_center, col_b = st.columns([1, 4, 1])
-    with col_center:
-        st.image(LOGO_FULL, use_container_width=True)
+    st.image(LOGO_FULL, use_container_width=True)
     st.write("<br>", unsafe_allow_html=True)
     if st.button("CONFIGURAR MI MENÚ"):
         st.session_state['paso'] = 'configurar'
@@ -135,10 +125,6 @@ if st.session_state['paso'] == 'inicio':
 
 # PANTALLA 2: SELECCIÓN
 elif st.session_state['paso'] == 'configurar':
-    col_l, col_center, col_r = st.columns([3, 2, 3])
-    with col_center:
-        st.image(LOGO_RECORTADO, width=150)
-    
     st.header("Configura tu semana")
     
     col1, col2 = st.columns(2)
@@ -152,6 +138,7 @@ elif st.session_state['paso'] == 'configurar':
         elif modo == "Inventario (I)":
             extra = st.multiselect("¿Qué ingredientes tienes?", sorted(df_maestro.iloc[:,0].unique().tolist()) if df_maestro is not None else [])
 
+    st.write("<br>", unsafe_allow_html=True)
     if st.button("GENERAR MENÚ"):
         res = motor_logica(df_recetas, modo, datos_extra=extra)
         if res is not None:
@@ -164,10 +151,6 @@ elif st.session_state['paso'] == 'configurar':
 
 # PANTALLA 3: MENÚ
 elif st.session_state['paso'] == 'menu':
-    col_l, col_center, col_r = st.columns([3, 1, 3])
-    with col_center:
-        st.image(LOGO_RECORTADO, width=100)
-    
     st.header("Tu Menú Semanal")
     n = st.session_state['comensales']
 
@@ -177,10 +160,7 @@ elif st.session_state['paso'] == 'menu':
         
         @st.dialog("Detalle de la Receta")
         def mostrar_ficha(datos):
-            # Logo centrado dentro del detalle
-            c1, c2, c3 = st.columns([2, 1, 2])
-            with c2: st.image(LOGO_RECORTADO, width=80)
-            
+            # Eliminado el logo para evitar vínculos rotos
             st.subheader(datos['Nombre'])
             st.write(f"⏱️ **Tiempo:** {datos.get('Tiempo', '25')} min | 🔥 **Calorías:** {datos.get('Calorias', 'N/A')}")
             st.divider()
