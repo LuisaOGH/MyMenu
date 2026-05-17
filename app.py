@@ -3,48 +3,37 @@ import pandas as pd
 import re
 import os
 import random
-import base64
 from collections import defaultdict
+import base64
 
 # --- 1. CONFIGURACIÓN Y ESTILO ---
 st.set_page_config(page_title="MyMenú", page_icon="🍴", layout="wide")
 
-# Solo mantenemos el logo principal para la pantalla de inicio
 LOGO_FULL = "https://raw.githubusercontent.com/LuisaOGH/MyMenu/main/logo.png"
 
 def local_css():
     st.markdown(f"""
     <style>
-    :root {{ 
-        --morado: #4D243D; 
-        --buganvilla: #E01E5A; 
-        --bg-cream: #F7F3E9; 
-    }}
+    :root {{ --morado: #4D243D; --buganvilla: #E01E5A; --bg-cream: #F7F3E9; }}
     .stApp {{ background-color: var(--bg-cream); }}
-    
-    /* Botones de acción GRANDES (Morado) */
     div.stButton > button {{
         background-color: var(--morado) !important;
         color: white !important;
-        font-size: 22px !important;
+        font-size: 20px !important;
         font-weight: bold !important;
-        padding: 15px !important;
-        border-radius: 15px !important;
+        padding: 12px !important;
+        border-radius: 12px !important;
         width: 100% !important;
         border: none !important;
     }}
-
-    /* Botones de Recetas (Buganvilla) */
     .btn-receta > div > button {{
         background-color: var(--buganvilla) !important;
         color: white !important;
-        font-size: 16px !important;
-        padding: 12px !important;
-        border-radius: 10px !important;
+        font-size: 15px !important;
+        border-radius: 8px !important;
         border: none !important;
     }}
-    
-    h1, h2, h3, h4 {{ color: var(--morado) !important; text-align: center; font-family: sans-serif; }}
+    h1, h2, h3, h4 {{ color: var(--morado) !important; text-align: center; }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -55,66 +44,87 @@ if 'paso' not in st.session_state: st.session_state['paso'] = 'inicio'
 if 'menu' not in st.session_state: st.session_state['menu'] = None
 if 'comensales' not in st.session_state: st.session_state['comensales'] = 2
 
-# --- 3. MOTORES Y FUNCIONES ---
+# --- 3. MOTORES Y FUNCIONES TÉCNICAS ---
 
 def escalar_valor(texto, n):
     if pd.isna(texto): return ""
     return re.sub(r'(\d+(?:\.\d+)?)', lambda m: str(round(float(m.group(1)) * n, 2)), str(texto))
 
-def normalizar_resultado(df_a, df_c, n_dias):
-    cant = min(n_dias, len(df_a), len(df_c))
-    if cant == 0: return None
-    plan = []
-    for i in range(cant):
-        plan.append({
-            'Día': i + 1,
-            'Almuerzo': df_a.iloc[i].to_dict(),
-            'Cena': df_c.iloc[i].to_dict()
-        })
-    return pd.DataFrame(plan)
+def es_repetido(nombre_nueva, nombre_anterior):
+    """Detecta si el ingrediente principal (primera palabra del nombre) se repite"""
+    if not nombre_anterior: return False
+    # Comparamos la primera palabra (ej: "Ensalada de garbanzos" -> "Ensalada")
+    # O mejor, buscamos palabras clave como 'Garbanzos', 'Arroz', 'Pasta'
+    palabras_clave = ['garbanzos', 'lentejas', 'arroz', 'pasta', 'pollo', 'merluza', 'ensalada']
+    for p in palabras_clave:
+        if p in nombre_nueva.lower() and p in nombre_anterior.lower():
+            return True
+    return False
 
-def motor_logica(df, modo, n_dias=7, datos_extra=None):
+def motor_logica_avanzado(df, modo, n_dias=7, datos_extra=None, recetas_fijas=None):
     df_copy = df.copy()
     df_copy['ID_str'] = df_copy['ID'].astype(str)
     
+    # 1. Separar Almuerzos y Cenas
+    alms = df_copy[df_copy['ID_str'].str.contains('A', case=False, na=False)]
+    cens = df_copy[df_copy['ID_str'].str.contains('C', case=False, na=False)]
+
+    # 2. Filtrar por el modo seleccionado
     if modo == "Orden (O)":
         df_copy['n_num'] = df_copy['ID_str'].str.extract(r'(\d+)').fillna(0).astype(int)
         df_filtrado = df_copy[df_copy['n_num'] > datos_extra].sort_values('n_num')
         alms = df_filtrado[df_filtrado['ID_str'].str.contains('A', case=False, na=False)]
         cens = df_filtrado[df_filtrado['ID_str'].str.contains('C', case=False, na=False)]
-    
     elif modo == "Inventario (I)":
-        def calcular_puntos(row):
-            count = 0
-            ing_receta = str(row.get('Ingredientes', '')).lower()
-            for ing in datos_extra:
-                if ing.lower() in ing_receta: count += 1
-            return count
-        df_copy['puntos'] = df_copy.apply(calcular_puntos, axis=1)
-        df_filtrado = df_copy[df_copy['puntos'] > 0].sort_values('puntos', ascending=False)
-        alms = df_filtrado[df_filtrado['ID_str'].str.contains('A', case=False, na=False)]
-        cens = df_filtrado[df_filtrado['ID_str'].str.contains('C', case=False, na=False)]
+        def score(row): return sum(1 for ing in datos_extra if ing.lower() in str(row['Ingredientes']).lower())
+        alms['puntos'] = alms.apply(score, axis=1)
+        cens['puntos'] = cens.apply(score, axis=1)
+        alms = alms[alms['puntos'] > 0].sort_values('puntos', ascending=False)
+        cens = cens[cens['puntos'] > 0].sort_values('puntos', ascending=False)
+    else: # Saludable
+        alms = alms.sample(frac=1)
+        cens = cens.sample(frac=1)
 
-    else: # Saludable (A)
-        alms = df_copy[df_copy['ID_str'].str.contains('A', case=False, na=False)].sample(frac=1)
-        cens = df_copy[df_copy['ID_str'].str.contains('C', case=False, na=False)].sample(frac=1)
-
-    return normalizar_resultado(alms, cens, n_dias)
-
-def crear_pdf_descargable(df_menu, n_personas):
-    # Creamos un HTML sencillo para el PDF
-    html_content = f"<h1>MyMenú Semanal (para {n_personas} personas)</h1>"
-    for _, fila in df_menu.iterrows():
-        html_content += f"<h3>Día {fila['Día']}</h3>"
-        html_content += f"<p><b>Almuerzo:</b> {fila['Almuerzo']['Nombre']}</p>"
-        html_content += f"<p><b>Cena:</b> {fila['Cena']['Nombre']}</p><hr>"
+    # 3. Construir el menú con filtro anti-repetición
+    plan = []
+    last_alm = ""
+    last_cen = ""
     
-    # Esto genera un link de descarga directa
-    b64 = base64.b64encode(html_content.encode()).decode()
-    href = f'<a href="data:text/html;base64,{b64}" download="menu_semanal.html" style="text-decoration:none;">' \
-           f'<div style="background-color:#4D243D;color:white;padding:15px;border-radius:10px;text-align:center;font-weight:bold;">' \
-           f'📥 DESCARGAR PLANING PARA COMPARTIR</div></a>'
-    return href
+    # Usar recetas fijas si existen
+    fijas_list = df_copy[df_copy['Nombre'].isin(recetas_fijas)] if recetas_fijas else pd.DataFrame()
+
+    for i in range(n_dias):
+        # Intentar sacar almuerzo (que no repita ingrediente)
+        cand_alms = alms[~alms['Nombre'].isin([p['Almuerzo']['Nombre'] for p in plan])]
+        pick_a = None
+        for _, c in cand_alms.iterrows():
+            if not es_repetido(c['Nombre'], last_alm):
+                pick_a = c.to_dict()
+                break
+        if not pick_a and not cand_alms.empty: pick_a = cand_alms.iloc[0].to_dict()
+
+        # Intentar sacar cena
+        cand_cens = cens[~cens['Nombre'].isin([p['Cena']['Nombre'] for p in plan])]
+        pick_c = None
+        for _, c in cand_cens.iterrows():
+            if not es_repetido(c['Nombre'], last_cen):
+                pick_c = c.to_dict()
+                break
+        if not pick_c and not cand_cens.empty: pick_c = cand_cens.iloc[0].to_dict()
+
+        if pick_a and pick_c:
+            plan.append({'Día': i+1, 'Almuerzo': pick_a, 'Cena': pick_c})
+            last_alm = pick_a['Nombre']
+            last_cen = pick_c['Nombre']
+
+    return pd.DataFrame(plan)
+
+def crear_descarga(df_menu):
+    html = "<h2>Mi Menú Semanal</h2>"
+    for _, r in df_menu.iterrows():
+        html += f"<p><b>Día {r['Día']}:</b> {r['Almuerzo']['Nombre']} / {r['Cena']['Nombre']}</p>"
+    b64 = base64.b64encode(html.encode()).decode()
+    return f'<a href="data:text/html;base64,{b64}" download="menu.html" style="color:white;text-decoration:none;">📥 DESCARGAR MENÚ</a>'
 
 # --- 4. CARGA DE DATOS ---
 @st.cache_data
@@ -131,97 +141,59 @@ df_recetas, df_maestro = cargar_datos()
 
 # --- 5. PANTALLAS ---
 
-# PANTALLA 1: INICIO
 if st.session_state['paso'] == 'inicio':
     st.image(LOGO_FULL, use_container_width=True)
-    st.write("<br>", unsafe_allow_html=True)
     if st.button("CONFIGURAR MI MENÚ"):
-        st.session_state['paso'] = 'configurar'
-        st.rerun()
+        st.session_state['paso'] = 'configurar'; st.rerun()
 
-# PANTALLA 2: SELECCIÓN
 elif st.session_state['paso'] == 'configurar':
-    st.header("Configura tu semana")
-    
+    st.header("Personaliza tu Menú")
     col1, col2 = st.columns(2)
     with col1:
-        modo = st.selectbox("Método de selección", ["Saludable (A)", "Inventario (I)", "Orden (O)"])
-        comensales = st.slider("¿Cuántos comensales?", 1, 6, st.session_state['comensales'])
+        modo = st.selectbox("Estrategia", ["Saludable (A)", "Inventario (I)", "Orden (O)"])
+        comensales = st.slider("Comensales", 1, 6, 2)
+        # NUEVO: Buscador por nombre
+        nombres_disponibles = sorted(df_recetas['Nombre'].unique().tolist()) if df_recetas is not None else []
+        fijas = st.multiselect("Fijar recetas específicas:", nombres_disponibles)
     with col2:
         extra = 0
-        if modo == "Orden (O)":
-            extra = st.number_input("Último ID cocinado:", min_value=0, step=1)
+        if modo == "Orden (O)": extra = st.number_input("Último ID:", min_value=0)
         elif modo == "Inventario (I)":
-            extra = st.multiselect("¿Qué ingredientes tienes?", sorted(df_maestro.iloc[:,0].unique().tolist()) if df_maestro is not None else [])
+            extra = st.multiselect("Tengo en la despensa:", sorted(df_maestro.iloc[:,0].unique().tolist()) if df_maestro is not None else [])
 
-    st.write("<br>", unsafe_allow_html=True)
-    if st.button("GENERAR MENÚ"):
-        res = motor_logica(df_recetas, modo, datos_extra=extra)
+    if st.button("GENERAR"):
+        res = motor_logica_avanzado(df_recetas, modo, datos_extra=extra, recetas_fijas=fijas)
         if res is not None:
             st.session_state['menu'] = res
             st.session_state['comensales'] = comensales
             st.session_state['paso'] = 'menu'
             st.rerun()
-        else:
-            st.error("No se encontraron recetas suficientes.")
 
-# PANTALLA 3: MENÚ
 elif st.session_state['paso'] == 'menu':
     st.header("Tu Menú Semanal")
     n = st.session_state['comensales']
-
+    
     for i, row in st.session_state['menu'].iterrows():
-        st.markdown(f"#### Día {row['Día']}")
-        col_a, col_c = st.columns(2)
-        
-        @st.dialog("Detalle de la Receta")
-        def mostrar_ficha(datos):
-            # Eliminado el logo para evitar vínculos rotos
-            st.subheader(datos['Nombre'])
-            st.write(f"⏱️ **Tiempo:** {datos.get('Tiempo', '25')} min | 🔥 **Calorías:** {datos.get('Calorias', 'N/A')}")
-            st.divider()
-            st.markdown("**🛒 Ingredientes:**")
-            st.write(escalar_valor(datos['Ingredientes'], n))
-            st.markdown("**👨‍🍳 Elaboración:**")
-            st.write(datos.get('Descripcion', 'Consulta el PDF.'))
+        st.write(f"#### Día {row['Día']}")
+        c_a, c_c = st.columns(2)
+        for col, datos, key in [(c_a, row['Almuerzo'], 'a'), (c_c, row['Cena'], 'c')]:
+            with col:
+                st.markdown('<div class="btn-receta">', unsafe_allow_html=True)
+                if st.button(datos['Nombre'], key=f"{key}{i}"):
+                    @st.dialog("Detalle")
+                    def show(d=datos):
+                        st.subheader(d['Nombre'])
+                        st.write(f"⏱ {d.get('Tiempo','25')} min | 🔥 {d.get('Calorias','-')}")
+                        st.markdown("**Ingredientes:**")
+                        st.write(escalar_valor(d['Ingredientes'], n))
+                        st.markdown("**Elaboración:**")
+                        st.write(d.get('Descripcion',''))
+                    show()
+                st.markdown('</div>', unsafe_allow_html=True)
 
-        with col_a:
-            st.markdown('<div class="btn-receta">', unsafe_allow_html=True)
-            if st.button(f"☀️ {row['Almuerzo']['Nombre']}", key=f"a_{i}"):
-                mostrar_ficha(row['Almuerzo'])
-            st.markdown('</div>', unsafe_allow_html=True)
-            
-        with col_c:
-            st.markdown('<div class="btn-receta">', unsafe_allow_html=True)
-            if st.button(f"🌙 {row['Cena']['Nombre']}", key=f"c_{i}"):
-                mostrar_ficha(row['Cena'])
-            st.markdown('</div>', unsafe_allow_html=True)
-
-    # LISTA DE LA COMPRA
     st.divider()
-    st.header("🛒 Lista de la Compra")
-    compra_cat = defaultdict(list)
-    mapeo = dict(zip(df_maestro.iloc[:,0].str.lower(), df_maestro.iloc[:,1].str.upper())) if df_maestro is not None else {}
-
-    for _, fila in st.session_state['menu'].iterrows():
-        for t in ['Almuerzo', 'Cena']:
-            ingreds = str(fila[t]['Ingredientes']).split(',')
-            for ing in ingreds:
-                ing = ing.strip()
-                cat = "VARIOS"
-                for nombre_maestro, categoria in mapeo.items():
-                    if nombre_maestro in ing.lower():
-                        cat = categoria
-                        break
-                compra_cat[cat].append(escalar_valor(ing, n))
-
-    for cat in sorted(compra_cat.keys()):
-        with st.expander(f"📍 {cat}"):
-            for item in sorted(set(compra_cat[cat])):
-                st.write(f"☐ {item.capitalize()}")
-
-    st.write("<br>", unsafe_allow_html=True)
-    st.markdown(crear_pdf_descargable(st.session_state['menu'], n), unsafe_allow_html=True)
-    if st.button("⬅️ VOLVER A SELECCIÓN"):
-        st.session_state['paso'] = 'configurar'
-        st.rerun()
+    # Botón de descarga
+    st.markdown(f'<div style="background-color:#4D243D;padding:15px;border-radius:10px;text-align:center;">{crear_descarga(st.session_state["menu"])}</div>', unsafe_allow_html=True)
+    
+    if st.button("⬅ VOLVER"):
+        st.session_state['paso'] = 'configurar'; st.rerun()
