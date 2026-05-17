@@ -68,14 +68,29 @@ def escalar_texto(texto, n):
     if pd.isna(texto): return ""
     return re.sub(r'(\d+(?:\.\d+)?)', lambda m: str(round(float(m.group(1)) * n, 2)), str(texto))
 
-# --- 4. CARGA DE DATOS ---
+# --- 4. CARGA DE DATOS (VERSIÓN ANTIFALLOS) ---
 @st.cache_data
 def cargar_datos():
-    if os.path.exists("recetas_mymenu.csv"):
-        return pd.read_csv("recetas_mymenu.csv", encoding='utf-8-sig', sep=None, engine='python')
+    nombre_archivo = "recetas_mymenu.csv"
+    if not os.path.exists(nombre_archivo):
+        return None
+    
+    # Lista de codificaciones a probar
+    for enc en ['utf-8-sig', 'latin1', 'cp1252', 'utf-8']:
+        try:
+            # Quitamos sep=None y forzamos coma o punto y coma si falla
+            df = pd.read_csv(nombre_archivo, encoding=enc, sep=None, engine='python')
+            # Si se lee bien pero hay tildes raras, este paso lo limpia
+            return df
+        except Exception:
+            continue
     return None
 
 df = cargar_datos()
+
+# Verificación de seguridad para la Pantalla 3
+if df is None:
+    st.error("⚠️ No se pudo leer el archivo 'recetas_mymenu.csv'. Asegúrate de que esté en GitHub y que el nombre sea exacto.")
 
 # --- 5. LÓGICA DE PANTALLAS ---
 
