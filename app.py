@@ -14,27 +14,18 @@ LOGO_RECORTADO = "https://raw.githubusercontent.com/LuisaOGH/MyMenu/main/logo_re
 def local_css():
     st.markdown(f"""
     <style>
-    :root {{
-        --morado: #4D243D;
-        --bg-cream: #F7F3E9;
-    }}
+    :root {{ --morado: #4D243D; --bg-cream: #F7F3E9; }}
     .stApp {{ background-color: var(--bg-cream); }}
-    
-    /* Estilo para botones grandes y morados */
     div.stButton > button {{
         background-color: var(--morado) !important;
         color: white !important;
-        font-size: 24px !important; /* Tamaño más grande */
+        font-size: 20px !important;
         font-weight: bold !important;
-        padding: 20px !important;
-        border-radius: 15px !important;
+        padding: 15px !important;
+        border-radius: 12px !important;
         width: 100% !important;
-        border: none !important;
     }}
-    
-    .logo-container {{ display: flex; justify-content: center; padding: 10px; }}
-    .logo-img {{ width: 150px; border-radius: 50%; }}
-    
+    .recipe-btn {{ margin-bottom: 10px; }}
     h1, h2, h3 {{ color: var(--morado) !important; text-align: center; }}
     </style>
     """, unsafe_allow_html=True)
@@ -46,119 +37,129 @@ if 'paso' not in st.session_state: st.session_state['paso'] = 'inicio'
 if 'menu' not in st.session_state: st.session_state['menu'] = None
 if 'comensales' not in st.session_state: st.session_state['comensales'] = 2
 
-# --- 3. MOTORES Y LÓGICA TÉCNICA ---
+# --- 3. MOTORES DE SELECCIÓN ---
 
-def escalar_texto(texto, n):
+def escalar_cantidades(texto, n):
     if pd.isna(texto): return ""
+    # Multiplica números por n personas
     return re.sub(r'(\d+(?:\.\d+)?)', lambda m: str(round(float(m.group(1)) * n, 2)), str(texto))
 
-def motor_O_orden(df, ultimo_id, num_dias=7):
+def motor_A_saludable(df):
     df.columns = [c.strip() for c in df.columns]
-    df['n_id'] = df['ID'].str.extract(r'(\d+)').fillna(0).astype(int)
-    # Filtramos las siguientes recetas después del ID introducido
-    proximas = df[df['n_id'] > ultimo_id].sort_values('n_id')
-    
-    alms = proximas[proximas['ID'].str.contains('A', na=False)]
-    cens = proximas[proximas['ID'].str.contains('C', na=False)]
-    
+    df_a = df[df['ID'].str.contains('A', na=False)].sample(min(7, len(df))).reset_index(drop=True)
+    df_c = df[df['ID'].str.contains('C', na=False)].sample(min(7, len(df))).reset_index(drop=True)
     plan = []
-    for i in range(min(num_dias, len(alms), len(cens))):
-        alm, cen = alms.iloc[i], cens.iloc[i]
+    for i in range(min(len(df_a), len(df_c))):
         plan.append({
             'Día': f'Día {i+1}', 
-            'Almuerzo': f"({alm['ID']}) {alm['Nombre']}", 'Ing_A': alm['Ingredientes'], 'Desc_A': alm.get('Descripcion', 'Ver PDF'),
-            'Cena': f"({cen['ID']}) {cen['Nombre']}", 'Ing_C': cen['Ingredientes'], 'Desc_C': cen.get('Descripcion', 'Ver PDF')
+            'Almuerzo': df_a.iloc[i], 'Cena': df_c.iloc[i]
         })
     return pd.DataFrame(plan)
 
-def generar_lista_compra(df_menu, comensales):
-    # Lógica simplificada para agrupar ingredientes
-    lista = defaultdict(float)
+def motor_I_ingredientes(df, disponibles):
+    df.columns = [c.strip() for c in df.columns]
+    disp_l = [x.lower().strip() for x in disponibles]
+    def score(row):
+        return sum(1 for ing in disp_l if ing in str(row.get('Ingredientes', '')).lower())
+    df['Score'] = df.apply(score, axis=1)
+    df_a = df[df['ID'].str.contains('A', na=False)].nlargest(10, 'Score').sample(3).reset_index(drop=True)
+    df_c = df[df['ID'].str.contains('C', na=False)].nlargest(10, 'Score').sample(3).reset_index(drop=True)
+    plan = []
+    for i in range(min(len(df_a), len(df_c))):
+        plan.append({'Día': f'Día {i+1}', 'Almuerzo': df_a.iloc[i], 'Cena': df_c.iloc[i]})
+    return pd.DataFrame(plan)
+
+def generar_lista_compra(df_menu, df_maestro, n):
+    # Diccionario: Categoria -> Producto -> Cantidad y Unidad
+    compra = defaultdict(lambda: defaultdict(lambda: {"cant": 0.0, "uni": ""}))
+    mapeo = dict(zip(df_maestro.iloc[:,0].str.lower(), df_maestro.iloc[:,1]))
+    
     for _, fila in df_menu.iterrows():
-        for col in ['Ing_A', 'Ing_C']:
-            items = str(fila[col]).split(',')
-            for item in items:
-                item = item.strip().capitalize()
-                if item and item != 'Nan':
-                    lista[item] += 1 # Aquí podrías mejorar la suma por unidades
-    return lista
+        for comida in [fila['Almuerzo'], fila['Cena']]:
+            ings = str(comida['Ingredientes']).split(',')
+            for item in ings:
+                match = re.search(r'([\d\.]+)\s*([a-zA-Záéíóú]+)\s+(.*)', item.strip())
+                if match:
+                    cant, uni, nom = float(match.group(1))*n, match.group(2), match.group(3).strip().lower()
+                    cat = mapeo.get(nom, "VARIOS").upper()
+                    compra[cat][nom]["cant"] += cant
+                    compra[cat][nom]["uni"] = uni
+                else:
+                    nom = item.strip().lower()
+                    cat = mapeo.get(nom, "VARIOS").upper()
+                    compra[cat][nom]["cant"] = 0 # Solo nombre
+    return compra
 
 # --- 4. CARGA DE DATOS ---
 @st.cache_data
 def cargar_datos():
-    file = "recetas_mymenu.csv"
-    if not os.path.exists(file): return None
-    for enc in ['utf-8-sig', 'latin1', 'cp1252', 'utf-8']:
-        try: return pd.read_csv(file, encoding=enc, sep=None, engine='python')
-        except: continue
-    return None
+    try:
+        df_r = pd.read_csv("recetas_mymenu.csv", encoding='utf-8-sig', sep=None, engine='python')
+        df_m = pd.read_csv("maestro_ingredientes.csv", encoding='utf-8-sig', sep=None, engine='python')
+        return df_r, df_m
+    except: return None, None
 
-df = cargar_datos()
+df_recetas, df_maestro = cargar_datos()
 
 # --- 5. PANTALLAS ---
 
-# PANTALLA 1: INICIO
 if st.session_state['paso'] == 'inicio':
     st.image(LOGO_FULL, use_container_width=True)
-    st.write("<br>", unsafe_allow_html=True)
     if st.button("IR A SELECCIÓN"):
         st.session_state['paso'] = 'configurar'
         st.rerun()
 
-# PANTALLA 2: CONFIGURACIÓN
 elif st.session_state['paso'] == 'configurar':
-    st.markdown(f'<div class="logo-container"><img src="{LOGO_RECORTADO}" class="logo-img"></div>', unsafe_allow_html=True)
-    st.header("Configura tu Plan")
-    
+    st.image(LOGO_RECORTADO, width=150)
     col1, col2 = st.columns(2)
     with col1:
-        modo = st.selectbox("Modo de selección", ["Orden (O)", "Saludable (A)"])
-        comensales = st.slider("¿Cuántos sois?", 1, 6, st.session_state['comensales'])
+        modo = st.selectbox("Modo", ["Saludable (A)", "Inventario (I)", "Orden (O)"])
+        comensales = st.slider("Personas", 1, 6, st.session_state['comensales'])
     with col2:
-        if modo == "Orden (O)":
-            ultimo_id = st.number_input("Número del último ID cocinado:", min_value=0, step=1)
-        else:
-            st.info("El modo Saludable elegirá recetas variadas al azar.")
+        if modo == "Inventario (I)":
+            tengo = st.multiselect("¿Qué tienes?", sorted(df_maestro.iloc[:,0].unique().tolist()))
+        elif modo == "Orden (O)":
+            ultimo_id = st.number_input("Último ID cocinado:", min_value=0)
 
-    st.write("<br>", unsafe_allow_html=True)
     if st.button("GENERAR MENÚ"):
-        if df is not None:
-            if modo == "Orden (O)":
-                st.session_state['menu'] = motor_O_orden(df, ultimo_id)
-            else:
-                # Motor A (Aleatorio)
-                st.session_state['menu'] = df.sample(7) # Simplificado para el ejemplo
-            
-            st.session_state['comensales'] = comensales
-            st.session_state['paso'] = 'menu'
-            st.rerun()
+        if modo == "Saludable (A)": st.session_state['menu'] = motor_A_saludable(df_recetas)
+        elif modo == "Inventario (I)": st.session_state['menu'] = motor_I_ingredientes(df_recetas, tengo)
+        st.session_state['comensales'] = comensales
+        st.session_state['paso'] = 'menu'
+        st.rerun()
 
-# PANTALLA 3: RESULTADO Y LISTA
 elif st.session_state['paso'] == 'menu':
-    st.markdown(f'<div class="logo-container"><img src="{LOGO_RECORTADO}" class="logo-img"></div>', unsafe_allow_html=True)
+    st.image(LOGO_RECORTADO, width=100)
+    n = st.session_state['comensales']
     
-    if st.session_state['menu'] is not None:
-        st.header("Tu Menú Semanal")
-        n = st.session_state['comensales']
+    # Mostrar Menú como botones
+    for i, row in st.session_state['menu'].iterrows():
+        st.write(f"### {row['Día']}")
+        c1, c2 = st.columns(2)
         
-        # Mostrar Menú
-        for i, row in st.session_state['menu'].iterrows():
-            with st.expander(f"📅 {row['Día']}: {row['Almuerzo']} | {row['Cena']}"):
-                c1, c2 = st.columns(2)
-                with c1:
-                    st.subheader("☀️ Almuerzo")
-                    st.info(escalar_texto(row['Ing_A'], n))
-                with c2:
-                    st.subheader("🌙 Cena")
-                    st.info(escalar_texto(row['Ing_C'], n))
-        
-        # Mostrar Lista de la Compra
-        st.write("---")
-        st.header("🛒 Lista de la Compra")
-        lista = generar_lista_compra(st.session_state['menu'], n)
-        for ing, cant in lista.items():
-            st.write(f"☐ {ing}")
+        for col, receta, llave in [(c1, row['Almuerzo'], 'A'), (c2, row['Cena'], 'C')]:
+            if col.button(f"{'☀️' if llave=='A' else '🌙'} {receta['Nombre']}", key=f"{llave}{i}"):
+                @st.dialog(receta['Nombre'])
+                def detalle():
+                    st.image(LOGO_RECORTADO, width=100)
+                    st.markdown(f"**🕒 Tiempo:** {receta.get('Tiempo', '20 min')} | **🔥 Calorías:** {receta.get('Calorias', 'N/A')}")
+                    st.subheader("🛒 Ingredientes")
+                    st.write(escalar_cantidades(receta['Ingredientes'], n))
+                    st.subheader("👨‍🍳 Preparación")
+                    st.write(receta.get('Descripcion', 'Consulta el PDF para el detalle.'))
+                detalle()
 
-        if st.button("⬅️ VOLVER A SELECCIÓN"):
-            st.session_state['paso'] = 'configurar'
-            st.rerun()
+    # Lista de la Compra
+    st.write("---")
+    st.header("🛒 Lista de la Compra")
+    compra_agrupada = generar_lista_compra(st.session_state['menu'], df_maestro, n)
+    
+    for cat, prods in compra_agrupada.items():
+        with st.expander(f"📍 {cat}"):
+            for p, d in prods.items():
+                cant_str = f"{d['cant']} {d['uni']}" if d['cant'] > 0 else ""
+                st.write(f"☐ {cant_str} {p.capitalize()}")
+
+    if st.button("⬅️ RECONFIGURAR"):
+        st.session_state['paso'] = 'configurar'
+        st.rerun()
