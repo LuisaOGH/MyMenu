@@ -1,11 +1,3 @@
-¡Perfecto! Ya casi lo tenemos. El error en el modo Orden (O) se debía a que estábamos intentando filtrar df (el dataframe original) usando una columna calculada sobre una copia, lo que generaba un conflicto de índices.
-
-He corregido esa línea, he insertado el logo en los tres puntos que me has pedido y he mantenido intacta toda la estética buganvilla y morada.
-
-Aquí tienes el bloque de código actualizado:
-
-Python
-
 import streamlit as st
 import pandas as pd
 import re
