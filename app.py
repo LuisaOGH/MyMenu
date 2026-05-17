@@ -90,16 +90,36 @@ df = cargar_datos()
 
 # PANTALLA 1: INICIO
 if st.session_state['paso'] == 'inicio':
+    # Logo principal
     st.image(LOGO_FULL, use_container_width=True)
-    st.write("<br><br>", unsafe_allow_html=True)
+    st.write("<br>", unsafe_allow_html=True)
     
-    st.markdown('<div class="btn-overlay-container">', unsafe_allow_html=True)
-    st.image(BTN_CONFIG, width=350)
-    # Este botón es invisible pero detecta el clic sobre la imagen
-    if st.button(" ", key="goto_config"):
-        st.session_state['paso'] = 'configurar'
-        st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
+    # MÉTODO DEFINITIVO: Usamos columnas para centrar y un botón con estilo
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        # Creamos el botón. Si se pulsa, cambia el estado.
+        # El truco aquí es que Streamlit detecta el clic ANTES de cualquier CSS.
+        if st.button("CONFIGURAR MI MENÚ", use_container_width=True):
+            st.session_state['paso'] = 'configurar'
+            st.rerun()
+        
+        # Debajo del botón, ponemos la imagen solo como referencia visual 
+        # o podemos integrarla en el CSS del botón.
+        st.image(BTN_CONFIG, use_container_width=True)
+
+    st.markdown("""
+        <style>
+        /* Forzamos que el botón de arriba sea transparente y cubra la imagen */
+        div.stButton > button {
+            height: 150px; /* Ajusta según el alto de tu botón_configurar */
+            margin-bottom: -150px; /* Tira la imagen hacia arriba para que coincidan */
+            background-color: transparent !important;
+            color: transparent !important;
+            border: none !important;
+            z-index: 1000;
+        }
+        </style>
+    """, unsafe_allow_html=True)
 
 # PANTALLA 2: CONFIGURACIÓN
 elif st.session_state['paso'] == 'configurar':
