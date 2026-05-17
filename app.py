@@ -21,29 +21,33 @@ def local_css():
     }}
     .stApp {{ background-color: var(--bg-cream); }}
     
+    /* Botones de acción (Morado) */
     div.stButton > button {{
         background-color: var(--morado) !important;
         color: white !important;
         font-size: 22px !important;
         font-weight: bold !important;
-        padding: 20px !important;
+        padding: 15px !important;
         border-radius: 15px !important;
         width: 100% !important;
         border: none !important;
-        box-shadow: 0px 4px 10px rgba(0,0,0,0.2);
     }}
 
+    /* Botones de Recetas (Buganvilla) */
     .btn-receta > div > button {{
         background-color: var(--buganvilla) !important;
         color: white !important;
         font-size: 16px !important;
-        padding: 15px !important;
+        padding: 12px !important;
         border-radius: 10px !important;
-        box-shadow: 2px 2px 5px rgba(0,0,0,0.1) !important;
     }}
     
-    .logo-header {{ display: flex; justify-content: center; margin-bottom: 10px; }}
-    .logo-img {{ width: 120px; border-radius: 50%; border: 2px solid var(--morado); }}
+    /* Contenedor para centrar el logo */
+    .logo-container {{
+        display: flex;
+        justify-content: center;
+        margin-bottom: 10px;
+    }}
     
     h1, h2, h3, h4 {{ color: var(--morado) !important; text-align: center; }}
     </style>
@@ -56,7 +60,7 @@ if 'paso' not in st.session_state: st.session_state['paso'] = 'inicio'
 if 'menu' not in st.session_state: st.session_state['menu'] = None
 if 'comensales' not in st.session_state: st.session_state['comensales'] = 2
 
-# --- 3. MOTORES DE SELECCIÓN ---
+# --- 3. MOTORES Y FUNCIONES ---
 
 def escalar_valor(texto, n):
     if pd.isna(texto): return ""
@@ -79,7 +83,6 @@ def motor_logica(df, modo, n_dias=7, datos_extra=None):
     df_copy['ID_str'] = df_copy['ID'].astype(str)
     
     if modo == "Orden (O)":
-        # CORRECCIÓN ERROR ORDEN (O): Extraemos el número y filtramos sobre el mismo dataframe
         df_copy['n_num'] = df_copy['ID_str'].str.extract(r'(\d+)').fillna(0).astype(int)
         df_filtrado = df_copy[df_copy['n_num'] > datos_extra].sort_values('n_num')
         alms = df_filtrado[df_filtrado['ID_str'].str.contains('A', case=False, na=False)]
@@ -128,8 +131,10 @@ if st.session_state['paso'] == 'inicio':
 
 # PANTALLA 2: SELECCIÓN
 elif st.session_state['paso'] == 'configurar':
-    # INSERTADO: Logo pequeño en cabecera
-    st.markdown(f'<div class="logo-header"><img src="{LOGO_RECORTADO}" class="logo-img"></div>', unsafe_allow_html=True)
+    # Logo corregido con st.image
+    col_l, col_r, col_ex = st.columns([1, 2, 1])
+    with col_r: st.image(LOGO_RECORTADO, width=120)
+    
     st.header("Configura tu semana")
     
     col1, col2 = st.columns(2)
@@ -155,8 +160,10 @@ elif st.session_state['paso'] == 'configurar':
 
 # PANTALLA 3: MENÚ
 elif st.session_state['paso'] == 'menu':
-    # INSERTADO: Logo pequeño en cabecera
-    st.markdown(f'<div class="logo-header"><img src="{LOGO_RECORTADO}" class="logo-img"></div>', unsafe_allow_html=True)
+    # Logo corregido con st.image
+    col_l, col_r, col_ex = st.columns([1, 2, 1])
+    with col_r: st.image(LOGO_RECORTADO, width=120)
+    
     st.header("Tu Menú Semanal")
     n = st.session_state['comensales']
 
@@ -164,11 +171,10 @@ elif st.session_state['paso'] == 'menu':
         st.markdown(f"#### Día {row['Día']}")
         col_a, col_c = st.columns(2)
         
-        # VENTANA EMERGENTE (DIÁLOGO)
         @st.dialog("Detalle de la Receta")
         def mostrar_ficha(datos):
-            # INSERTADO: Logo pequeño dentro del detalle
-            st.markdown(f'<div style="text-align:center; margin-bottom:10px;"><img src="{LOGO_RECORTADO}" width="70"></div>', unsafe_allow_html=True)
+            # Logo corregido dentro del diálogo
+            st.image(LOGO_RECORTADO, width=80)
             st.subheader(datos['Nombre'])
             st.write(f"⏱️ **Tiempo:** {datos.get('Tiempo', '25')} min | 🔥 **Calorías:** {datos.get('Calorias', 'N/A')}")
             st.divider()
