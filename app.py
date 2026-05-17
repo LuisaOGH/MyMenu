@@ -197,3 +197,106 @@ elif st.session_state['paso'] == 'menu':
     
     if st.button("⬅ VOLVER"):
         st.session_state['paso'] = 'configurar'; st.rerun()
+
+# --- 1. ACTUALIZACIÓN DE COLORES EN CSS ---
+def local_css():
+    st.markdown(f"""
+    <style>
+    :root {{ 
+        --morado: #4D243D; 
+        --buganvilla: #E01E5A; 
+        --albero: #DDBB66; /* Color Albero */
+        --berenjena: #3B0B2E; /* Color Berenjena muy oscuro */
+        --bg-cream: #F7F3E9; 
+    }}
+    .stApp {{ background-color: var(--bg-cream); }}
+    
+    /* Botones de descarga ALBERO con letras BERENJENA */
+    .btn-descarga {{
+        background-color: var(--albero) !important;
+        color: var(--berenjena) !important;
+        padding: 15px;
+        border-radius: 12px;
+        text-align: center;
+        font-weight: bold;
+        text-decoration: none;
+        display: block;
+        margin-bottom: 10px;
+        border: 2px solid var(--berenjena);
+        font-size: 18px;
+    }}
+    
+    /* Botones estándar de MyMenú */
+    div.stButton > button {{
+        background-color: var(--morado) !important;
+        color: white !important;
+        font-size: 20px !important;
+        font-weight: bold !important;
+        padding: 12px !important;
+        border-radius: 12px !important;
+        width: 100% !important;
+        border: none !important;
+    }}
+    .btn-receta > div > button {{
+        background-color: var(--buganvilla) !important;
+        color: white !important;
+        font-size: 15px !important;
+        border-radius: 8px !important;
+    }}
+    h1, h2, h3, h4 {{ color: var(--morado) !important; text-align: center; }}
+    </style>
+    """, unsafe_allow_html=True)
+
+# --- 2. NUEVAS FUNCIONES DE DESCARGA ---
+
+def crear_descarga_menu(df_menu):
+    html = "<h2>📅 Planing Semanal MyMenú</h2>"
+    for _, r in df_menu.iterrows():
+        html += f"<p><b>Día {r['Día']}:</b> Almuerzo: {r['Almuerzo']['Nombre']} | Cena: {r['Cena']['Nombre']}</p>"
+    b64 = base64.b64encode(html.encode()).decode()
+    return f'<a href="data:text/html;base64,{b64}" download="menu_semanal.html" class="btn-descarga">📥 DESCARGAR PLANING SEMANAL</a>'
+
+def crear_descarga_compra(df_menu, df_maestro, n):
+    # Lógica para agrupar ingredientes
+    compra_cat = defaultdict(list)
+    mapeo = dict(zip(df_maestro.iloc[:,0].str.lower(), df_maestro.iloc[:,1].str.upper())) if df_maestro is not None else {}
+    
+    for _, fila in df_menu.iterrows():
+        for t in ['Almuerzo', 'Cena']:
+            ingreds = str(fila[t]['Ingredientes']).split(',')
+            for ing in ingreds:
+                ing = ing.strip()
+                cat = "VARIOS"
+                for nombre_maestro, categoria in mapeo.items():
+                    if nombre_maestro in ing.lower():
+                        cat = categoria
+                        break
+                compra_cat[cat].append(escalar_valor(ing, n))
+
+    html = "<h2>🛒 Lista de la Compra MyMenú</h2>"
+    for cat in sorted(compra_cat.keys()):
+        html += f"<h3>{cat}</h3><ul>"
+        for item in sorted(set(compra_cat[cat])):
+            html += f"<li>[ ] {item.capitalize()}</li>"
+        html += "</ul>"
+    
+    b64 = base64.b64encode(html.encode()).decode()
+    return f'<a href="data:text/html;base64,{b64}" download="lista_compra.html" class="btn-descarga">🛒 DESCARGAR LISTA DE LA COMPRA</a>'
+
+# --- 3. DENTRO DE LA PANTALLA 3 (MENU) ---
+
+elif st.session_state['paso'] == 'menu':
+    st.header("Tu Menú Semanal")
+    n = st.session_state['comensales']
+    
+    # ... (aquí va tu código de mostrar los botones de las recetas) ...
+
+    st.divider()
+    
+    # Mostramos los dos botones con el estilo solicitado
+    st.markdown(crear_descarga_menu(st.session_state['menu']), unsafe_allow_html=True)
+    st.markdown(crear_descarga_compra(st.session_state['menu'], df_maestro, n), unsafe_allow_html=True)
+    
+    if st.button("⬅ VOLVER A CONFIGURACIÓN"):
+        st.session_state['paso'] = 'configurar'
+        st.rerun()
