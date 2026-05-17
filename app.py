@@ -119,7 +119,7 @@ if os.path.exists("recetas_mymenu.csv") and os.path.exists("maestro_ingredientes
 # Mostrar Logo Recortado centrado (Siempre arriba)
 st.markdown(f'<div class="logo-container"><img src="{LOGO_RECORTADO}" class="logo-img"></div>', unsafe_allow_html=True)
 
-    # --- 5. RENDERIZADO DEL MENÚ ---
+# --- 5. RENDERIZADO DEL MENÚ ---
     if 'menu' in st.session_state and st.session_state['menu'] is not None:
         n = st.session_state.get('comensales', 1)
         for i, row in st.session_state['menu'].iterrows():
@@ -146,5 +146,3 @@ st.markdown(f'<div class="logo-container"><img src="{LOGO_RECORTADO}" class="log
     else:
         # Si no hay menú, mostramos el logo con eslogan grande para dar la bienvenida
         st.image(LOGO_FULL, use_container_width=True)
-else:
-    st.error("Error: Sube los archivos CSV al repositorio.")
