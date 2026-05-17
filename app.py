@@ -120,29 +120,29 @@ if os.path.exists("recetas_mymenu.csv") and os.path.exists("maestro_ingredientes
 st.markdown(f'<div class="logo-container"><img src="{LOGO_RECORTADO}" class="logo-img"></div>', unsafe_allow_html=True)
 
 # --- 5. RENDERIZADO DEL MENÚ ---
-    if 'menu' in st.session_state and st.session_state['menu'] is not None:
-        n = st.session_state.get('comensales', 1)
-        for i, row in st.session_state['menu'].iterrows():
-            with st.container():
-                c1, c2, c3 = st.columns([1, 2, 2])
-                c1.subheader(row['Día'])
+if 'menu' in st.session_state and st.session_state['menu'] is not None:
+    n = st.session_state.get('comensales', 1)
+    for i, row in st.session_state['menu'].iterrows():
+        with st.container():
+            c1, c2, c3 = st.columns([1, 2, 2])
+            c1.subheader(row['Día'])
                 
-                # Botones de platos
-                if c2.button(f"🥗 {row['Almuerzo']}", key=f"a{i}"):
-                    @st.dialog(row['Almuerzo'])
-                    def modal_a():
-                        st.write(f"**Cantidades para {n} personas:**")
-                        st.info(escalar_texto(row['Ing_A'], n))
-                        st.write("**Preparación:**", row['Desc_A'])
-                    modal_a()
+            # Botones de platos
+            if c2.button(f"🥗 {row['Almuerzo']}", key=f"a{i}"):
+                @st.dialog(row['Almuerzo'])
+                def modal_a():
+                    st.write(f"**Cantidades para {n} personas:**")
+                    st.info(escalar_texto(row['Ing_A'], n))
+                    st.write("**Preparación:**", row['Desc_A'])
+                modal_a()
 
-                if c3.button(f"🌙 {row['Cena']}", key=f"c{i}"):
-                    @st.dialog(row['Cena'])
-                    def modal_c():
-                        st.write(f"**Cantidades para {n} personas:**")
-                        st.info(escalar_texto(row['Ing_C'], n))
-                        st.write("**Preparación:**", row['Desc_C'])
-                    modal_c()
-    else:
-        # Si no hay menú, mostramos el logo con eslogan grande para dar la bienvenida
-        st.image(LOGO_FULL, use_container_width=True)
+            if c3.button(f"🌙 {row['Cena']}", key=f"c{i}"):
+                @st.dialog(row['Cena'])
+                def modal_c():
+                    st.write(f"**Cantidades para {n} personas:**")
+                    st.info(escalar_texto(row['Ing_C'], n))
+                    st.write("**Preparación:**", row['Desc_C'])
+                modal_c()
+else:
+    # Si no hay menú, mostramos el logo con eslogan grande para dar la bienvenida
+    st.image(LOGO_FULL, use_container_width=True)
