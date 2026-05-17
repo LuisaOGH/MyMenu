@@ -99,29 +99,25 @@ def escalar_texto(texto, n):
         return str(round(float(match.group(1)) * n, 2))
     return re.sub(r'(\d+(?:\.\d+)?)', mult, texto)
 
-# --- 4. CARGA Y UI ---
+# --- 4. CARGA Y LOGO ---
 df, df_maestro = None, None
+
+def cargar_csv_seguro(nombre_archivo):
+    # Lista de codificaciones a probar en orden de probabilidad
+    encodings = ['utf-8-sig', 'utf-8', 'latin1', 'cp1252']
+    for enc in encodings:
+        try:
+            return pd.read_csv(nombre_archivo, encoding=enc, sep=None, engine='python')
+        except (UnicodeDecodeError, Exception):
+            continue
+    return None
+
 if os.path.exists("recetas_mymenu.csv") and os.path.exists("maestro_ingredientes.csv"):
-    df = pd.read_csv("recetas_mymenu.csv", encoding='utf-8-sig', sep=None, engine='python')
-    df_maestro = pd.read_csv("maestro_ingredientes.csv", encoding='utf-8-sig', sep=None, engine='python')
+    df = cargar_csv_seguro("recetas_mymenu.csv")
+    df_maestro = cargar_csv_seguro("maestro_ingredientes.csv")
 
 # Mostrar Logo Recortado centrado (Siempre arriba)
 st.markdown(f'<div class="logo-container"><img src="{LOGO_RECORTADO}" class="logo-img"></div>', unsafe_allow_html=True)
-
-if df is not None:
-    # Sidebar
-    st.sidebar.header("Configuración")
-    modo = st.sidebar.selectbox("¿Cómo planificamos?", ["Saludable (A)", "Inventario (I)", "Orden (O)"])
-    comensales = st.sidebar.slider("Comensales", 1, 6, 2)
-    
-    tengo = []
-    if modo == "Inventario (I)":
-        tengo = st.sidebar.multiselect("¿Qué tienes en la cocina?", sorted(df_maestro.iloc[:,0].unique().tolist()))
-
-    if st.sidebar.button("🚀 GENERAR MI PLAN"):
-        if modo == "Saludable (A)": st.session_state['menu'] = motor_A_avanzado(df)
-        elif modo == "Inventario (I)": st.session_state['menu'] = motor_I_avanzado(df, tengo)
-        st.session_state['comensales'] = comensales
 
     # --- 5. RENDERIZADO DEL MENÚ ---
     if 'menu' in st.session_state and st.session_state['menu'] is not None:
